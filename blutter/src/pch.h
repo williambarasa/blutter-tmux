@@ -6,10 +6,10 @@
 
 #ifndef PCH_H
 #define PCH_H
-
+#define FMT_HEADER_ONLY
 // add headers that you want to pre-compile here
 #include <string>
-#include <format>
+#include "fmt/format.h"
 #include <vector>
 #include <algorithm>
 #include <unordered_map>

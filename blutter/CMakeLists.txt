@@ -18,10 +18,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 	# for macOS only
 	cmake_path(GET CMAKE_CXX_COMPILER PARENT_PATH LLVM_BIN_DIR)
-	# <format> library is experimental in clang 15 and 16
-	add_compile_options(-fexperimental-library)
-	# need an extra lib for experimental library
-	add_link_options(-fexperimental-library -L${LLVM_BIN_DIR}/../lib/c++ -dead_strip)
 endif()
 
 find_package(${DARTLIB} REQUIRED PATHS "${PROJECT_SOURCE_DIR}/../packages")

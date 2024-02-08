@@ -6,6 +6,17 @@ Also the application is currently work only against recent Dart versions.
 
 For high priority missing features, see [TODO](#todo)
 
+## Termux
+
+- same as debian but needs ndk . if you dont want ndk then remove android library dependencies related files in dartsdk
+- i actually liked [fmt](https://github.com/fmtlib/fmt.git) library thats the main reason replaced standard format
+- you need to replace all occurance of std::format with fmt
+  ```find -type f -exec sed -i 's/std::format/fmt::format/g' {} +```
+- it should work for both dartsdk stable/beta builds didnt checked for dev builds
+- if any error related to capstone first check if is present in include dir  
+    ```pkg-config --cflags capstone```
+- if you see error regarding ```__android_log_vprint``` then set ldflags for that
+
 
 ## Environment Setup
 This application uses C++20 Formatting library. It requires very recent C++ compiler such as g++>=13, Clang>=16.

@@ -1,3 +1,5 @@
+
+
 # B(l)utter
 Flutter Mobile Application Reverse Engineering Tool by Compiling Dart AOT Runtime
 
@@ -16,6 +18,8 @@ For high priority missing features, see [TODO](#todo)
 - if any error related to capstone first check if is present in include dir  
     ```pkg-config --cflags capstone```
 - if you see error regarding ```__android_log_vprint``` then set ldflags for that
+
+https://github.com/dedshit/blutter-termux/assets/62318734/b7376844-96b0-4aa0-a395-9009d009132e
 
 
 ## Environment Setup

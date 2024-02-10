@@ -12,6 +12,7 @@ For high priority missing features, see [TODO](#todo)
 
 - same as debian but needs ndk . if you dont want ndk then remove android library dependencies related files in dartsdk
 - i actually liked [fmt](https://github.com/fmtlib/fmt.git) library thats the main reason replaced standard format
+- Install `fmt`: `pkg install fmt`
 - you need to replace all occurance of std::format with fmt
   ```find -type f -exec sed -i 's/std::format/fmt::format/g' {} +```
 - it should work for both dartsdk stable/beta builds didnt checked for dev builds

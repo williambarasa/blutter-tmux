@@ -10,14 +10,20 @@ For high priority missing features, see [TODO](#todo)
 
 ## Termux
 
-- same as debian but needs ndk . if you dont want ndk then remove android library dependencies related files in dartsdk
-- i actually liked [fmt](https://github.com/fmtlib/fmt.git) library thats the main reason replaced standard format
+- Same as debian but needs ndk . if you dont want ndk then remove android library dependencies related files in dartsdk
+- I actually liked [fmt](https://github.com/fmtlib/fmt.git) library thats the main reason replaced standard format
+- Install `fmt`: `pkg install fmt`
 - you need to replace all occurance of std::format with fmt
   ```find -type f -exec sed -i 's/std::format/fmt::format/g' {} +```
-- it should work for both dartsdk stable/beta builds didnt checked for dev builds
-- if any error related to capstone first check if is present in include dir  
+  - This can be done `pre` by me in the repo also but considering future sync with main blutter repo and keep conflicts less i avoided doing so.
+- It should work for both dartsdk stable/beta builds didnt checked for dev builds
+- If any error related to capstone first check if is present in include dir  
     ```pkg-config --cflags capstone```
-- if you see error regarding ```__android_log_vprint``` then set ldflags for that
+
+**OR You can copy paste below command to install all requirements:**
+```
+pip install requests pyelftools && pkg install -y git cmake ninja build-essential pkg-config libicu capstone fmt
+```
 
 https://github.com/dedshit/blutter-termux/assets/62318734/b7376844-96b0-4aa0-a395-9009d009132e
 

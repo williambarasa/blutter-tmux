@@ -40,6 +40,10 @@ add_executable(${BINNAME} ${SRCS})
 
 target_link_libraries(${BINNAME} ${DARTLIB} capstone)
 
+if (ANDROID)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -llog")
+endif()
+
 target_precompile_headers(${BINNAME} PRIVATE "${SRCDIR}/pch.h")
 
 if (MSVC)

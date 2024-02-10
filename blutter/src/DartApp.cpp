@@ -6,7 +6,7 @@ PRAGMA_WARNING(push, 0)
 #include <vm/stub_code.h>
 #include <vm/heap/safepoint.h>
 PRAGMA_WARNING(pop)
-#include "core.h"
+#include "fmt/format.h"
 #include <iostream> // for debugging purpose
 
 DartApp::DartApp(const char* path) : ppool(NULL), nativeLib(0xdeadead), throwStubAddr(0)

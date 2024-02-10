@@ -20,6 +20,11 @@ For high priority missing features, see [TODO](#todo)
 - If any error related to capstone first check if is present in include dir  
     ```pkg-config --cflags capstone```
 
+**OR You can copy paste below command to install all requirements:**
+```
+pip install requests pyelftools && pkg install -y git cmake ninja build-essential pkg-config libicu capstone fmt
+```
+
 https://github.com/dedshit/blutter-termux/assets/62318734/b7376844-96b0-4aa0-a395-9009d009132e
 
 

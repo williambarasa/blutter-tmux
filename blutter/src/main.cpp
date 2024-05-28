@@ -51,6 +51,9 @@ int main(int argc, char** argv)
 		std::cout << "Generating application functions in asm folder\n";
 #endif
 		dumper.DumpCode((outDir / "asm").string().c_str());
+		std::cout << "Generating radare2 script\n";
+		dumper.Dump4Radare2(outDir / "r2_script");
+		std::cout << "Generating IDA script\n";
 		dumper.Dump4Ida(outDir / "ida_script");
 
 		std::cout << "Generating Frida script\n";

@@ -15,7 +15,7 @@ For high priority missing features, see [TODO](#todo)
 - Install `fmt`: `pkg install fmt`
 - you need to replace all occurance of std::format with fmt
   ```find -type f -exec sed -i 's/std::format/fmt::format/g' {} +```
-  - This can be done `pre` by me in the repo also but considering future sync with main blutter repo and keep conflicts less i avoided doing so.
+> You only need to manually replace 'std::format' with 'fmt::format' in all files using the provided command once, after the first clone. Thereafter, our script `blutter.py` will automatically check for updates from the repo and if an update is available, it will not only update the code but also replace any occurrences of 'std::format', making manual intervention unnecessary.
 - It should work for both dartsdk stable/beta builds didnt checked for dev builds
 - If any error related to capstone first check if is present in include dir  
     ```pkg-config --cflags capstone```

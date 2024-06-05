@@ -247,8 +247,8 @@ def check_for_updates_and_pull():
         # Pull the changes from the remote repository
         run_command("git pull")
 
-        # Replace 'fmt::format' with 'fmt::format' in all files
-        run_command("find -type f -exec sed -i 's/fmt::format/fmt::format/g' {} +")
+        # Replace 'std::format' with 'fmt::format' in all files
+        run_command("find -type f -exec sed -i 's/std::format/fmt::format/g' {} +")
 
 
 if __name__ == "__main__":

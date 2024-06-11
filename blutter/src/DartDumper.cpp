@@ -76,8 +76,8 @@ void DartDumper::Dump4Radare2(std::filesystem::path outDir)
 	std::ofstream of((outDir / "addNames.r2").string());
 	of << "# create flags for libraries, classes and methods\n";
 
-	of << std::format("f app.base = {:#x}\n", app.base());
-	of << std::format("f app.heap_base = {:#x}\n", app.heap_base());
+	of << fmt::format("f app.base = {:#x}\n", app.base());
+	of << fmt::format("f app.heap_base = {:#x}\n", app.heap_base());
 
 	bool show_library = true;
 	bool show_class = true;
@@ -96,20 +96,20 @@ void DartDumper::Dump4Radare2(std::filesystem::path outDir)
 				std::replace(name.begin(), name.end(), '$', '_');
 				std::replace(name.begin(), name.end(), '&', '_');
 				if (show_library) {
-					of << std::format("CC Library({:#x}) = {} @ {}\n", lib->id, lib_prefix, ep);
-					of << std::format("f lib.{}={:#x} # {:#x}\n", lib_prefix, ep, lib->id);
+					of << fmt::format("CC Library({:#x}) = {} @ {}\n", lib->id, lib_prefix, ep);
+					of << fmt::format("f lib.{}={:#x} # {:#x}\n", lib_prefix, ep, lib->id);
 					show_library = false;
 				}
 				if (show_class) {
-					of << std::format("CC Class({:#x}) = {} @ {}\n", cls->Id(), cls_prefix, ep);
-					of << std::format("f class.{}.{}={:#x} # {:#x}\n", lib_prefix, cls_prefix, ep, cls->Id());
+					of << fmt::format("CC Class({:#x}) = {} @ {}\n", cls->Id(), cls_prefix, ep);
+					of << fmt::format("f class.{}.{}={:#x} # {:#x}\n", lib_prefix, cls_prefix, ep, cls->Id());
 					show_class = false;
 				}
-				of << std::format("f method.{}.{}.{}={:#x}\n", lib_prefix, cls_prefix, name.c_str(), ep);
+				of << fmt::format("f method.{}.{}.{}={:#x}\n", lib_prefix, cls_prefix, name.c_str(), ep);
 				if (dartFn->HasMorphicCode()) {
-					of << std::format("f method.{}.{}.{}.miss={:#x}\n", lib_prefix, cls_prefix, name.c_str(), 
+					of << fmt::format("f method.{}.{}.{}.miss={:#x}\n", lib_prefix, cls_prefix, name.c_str(), 
 							dartFn->PayloadAddress());
-					of << std::format("f method.{}.{}.{}.check={:#x}\n", lib_prefix, cls_prefix, name.c_str(), 
+					of << fmt::format("f method.{}.{}.{}.check={:#x}\n", lib_prefix, cls_prefix, name.c_str(), 
 							dartFn->MonomorphicAddress());
 				}
 			}
@@ -133,11 +133,11 @@ void DartDumper::Dump4Ida(std::filesystem::path outDir)
 			for (auto dartFn : cls->Functions()) {
 				const auto ep = dartFn->Address();
 				auto name = getFunctionName4Ida(*dartFn, cls_prefix);
-				of << std::format("ida_funcs.add_func({:#x}, {:#x})\n", ep, ep + dartFn->Size());
-				of << std::format("idaapi.set_name({:#x}, \"{}_{}::{}_{:x}\")\n", ep, lib_prefix, cls_prefix, name.c_str(), ep);
+				of << fmt::format("ida_funcs.add_func({:#x}, {:#x})\n", ep, ep + dartFn->Size());
+				of << fmt::format("idaapi.set_name({:#x}, \"{}_{}::{}_{:x}\")\n", ep, lib_prefix, cls_prefix, name.c_str(), ep);
 				if (dartFn->HasMorphicCode()) {
-					of << std::format("idaapi.set_name({:#x}, \"{}_{}::{}_{:x}_miss\")\n", dartFn->PayloadAddress(), lib_prefix, cls_prefix, name.c_str(), ep);
-					of << std::format("idaapi.set_name({:#x}, \"{}_{}::{}_{:x}_check\")\n", dartFn->MonomorphicAddress(), lib_prefix, cls_prefix, name.c_str(), ep);
+					of << fmt::format("idaapi.set_name({:#x}, \"{}_{}::{}_{:x}_miss\")\n", dartFn->PayloadAddress(), lib_prefix, cls_prefix, name.c_str(), ep);
+					of << fmt::format("idaapi.set_name({:#x}, \"{}_{}::{}_{:x}_check\")\n", dartFn->MonomorphicAddress(), lib_prefix, cls_prefix, name.c_str(), ep);
 				}
 			}
 		}
@@ -151,10 +151,10 @@ void DartDumper::Dump4Ida(std::filesystem::path outDir)
 		std::replace(name.begin(), name.end(), '>', '@');
 		std::replace(name.begin(), name.end(), ',', '&');
 		std::replace(name.begin(), name.end(), ' ', '_');
-		of << std::format("idaapi.set_name({:#x}, \"{}_{:x}\")\n", ep, name.c_str(), ep);
+		of << fmt::format("idaapi.set_name({:#x}, \"{}_{:x}\")\n", ep, name.c_str(), ep);
 		if (stub->Size() == 0)
 			continue;
-		of << std::format("ida_funcs.add_func({:#x}, {:#x})\n", ep, ep + stub->Size());
+		of << fmt::format("ida_funcs.add_func({:#x}, {:#x})\n", ep, ep + stub->Size());
 	}
 
 
@@ -226,26 +226,26 @@ std::vector<std::pair<intptr_t, std::string>> DartDumper::DumpStructHeaderFile(s
 			if (obj.IsUnlinkedCall()) {
 				const auto imm = pool.RawValueAt(i + 1);
 				auto dartFn = app.GetFunction(imm - app.base());
-				name = std::format("UnlinkedCall_{:#x}_{:#x}", offset, dartFn->Address(), offset);
+				name = fmt::format("UnlinkedCall_{:#x}_{:#x}", offset, dartFn->Address(), offset);
 			}
 			else {
 				// TODO: more meaningful variable name
-				name = std::format("Obj_{:#x}", offset);
+				name = fmt::format("Obj_{:#x}", offset);
 				auto comment = ObjectToString(obj);
 				comments.push_back(std::make_pair(offset, comment));
 			}
 		}
 		else if (objType == dart::ObjectPool::EntryType::kImmediate) {
-			name = std::format("IMM_{:#x}_{:#x}", pool.RawValueAt(i), offset);
+			name = fmt::format("IMM_{:#x}_{:#x}", pool.RawValueAt(i), offset);
 		}
 		else if (objType == dart::ObjectPool::EntryType::kNativeFunction) {
 			// the name of NativeFunction can be retrieved from dart::NativeSymbolResolver::LookupSymbolName
 			//   but normally flutter code never access it
 			// if we use the name, we should cache it because many Pool Objects reference same NativeFunction
-			name = std::format("NativeFn_{:#x}_{:#x}", pool.RawValueAt(i), offset);
+			name = fmt::format("NativeFn_{:#x}_{:#x}", pool.RawValueAt(i), offset);
 		}
 		else {
-			name = std::format("RAW_{:#x}_{:#x}", pool.RawValueAt(i), offset);
+			name = fmt::format("RAW_{:#x}_{:#x}", pool.RawValueAt(i), offset);
 		}
 
 		of << "\t__int64 " << name << ";\n";
@@ -368,7 +368,7 @@ void DartDumper::DumpCode(const char* out_dir)
 								auto retCid = fn->ReturnType();
 								if (retCid != dart::kIllegalCid) {
 									auto retCls = app.classes.at(retCid);
-									extra += std::format(" -> {} (size={:#x})", retCls->FullName(), retCls->Size());
+									extra += fmt::format(" -> {} (size={:#x})", retCls->FullName(), retCls->Size());
 								}
 							}
 							break;
@@ -383,14 +383,14 @@ void DartDumper::DumpCode(const char* out_dir)
 						else {
 							while ((*il_itr)->Start() < asmText.addr) {
 								if ((*il_itr)->Kind() != ILInstr::Unknown) {
-									of << std::format("{:#x}: {}\n", (*il_itr)->Start(), (*il_itr)->ToString());
+									of << fmt::format("{:#x}: {}\n", (*il_itr)->Start(), (*il_itr)->ToString());
 									of << "    // ";
 								}
 								++il_itr;
 							}
 							if ((*il_itr)->Start() == asmText.addr) {
 								if ((*il_itr)->Kind() != ILInstr::Unknown) {
-									of << std::format("{:#x}: {}\n", asmText.addr, (*il_itr)->ToString());
+									of << fmt::format("{:#x}: {}\n", asmText.addr, (*il_itr)->ToString());
 									of << "    //     ";
 									range = (*il_itr)->Range();
 								}
@@ -399,9 +399,9 @@ void DartDumper::DumpCode(const char* out_dir)
 						}
 
 						if (extra.empty())
-							of << std::format("{:#x}: {}\n", asmText.addr, &asmText.text[0]);
+							of << fmt::format("{:#x}: {}\n", asmText.addr, &asmText.text[0]);
 						else
-							of << std::format("{:#x}: {}  ; {}\n", asmText.addr, &asmText.text[0], extra);
+							of << fmt::format("{:#x}: {}  ; {}\n", asmText.addr, &asmText.text[0], extra);
 					}
 				}
 #endif // NO_CODE_ANALYSIS
@@ -440,7 +440,7 @@ std::string DartDumper::ObjectToString(dart::Object& obj, bool simpleForm, bool 
 			switch (arr.ElementType()) {
 #define ACCUMLATE(type) { \
 	auto data = (type*)ptr; \
-	txt = std::accumulate(data + 1, data + arr_len, std::format("[{:#x}", data[0]), [](std::string x, type y) { return x + ", " + std::format("{:#x}", y); } ); \
+	txt = std::accumulate(data + 1, data + arr_len, fmt::format("[{:#x}", data[0]), [](std::string x, type y) { return x + ", " + fmt::format("{:#x}", y); } ); \
 }
 			case dart::kInt8ArrayElement:
 				ACCUMLATE(int8_t);
@@ -470,7 +470,7 @@ std::string DartDumper::ObjectToString(dart::Object& obj, bool simpleForm, bool 
 #undef ACCUMLATE
 #define ACCUMLATE(type) { \
 	auto data = (type*)ptr; \
-	txt = std::accumulate(data + 1, data + arr_len, std::format("[{}", data[0]), [](std::string x, type y) { return x + ", " + std::format("{}", y); } ); \
+	txt = std::accumulate(data + 1, data + arr_len, fmt::format("[{}", data[0]), [](std::string x, type y) { return x + ", " + fmt::format("{}", y); } ); \
 }
 			case dart::kFloat32ArrayElement:
 				ACCUMLATE(float);
@@ -488,22 +488,22 @@ std::string DartDumper::ObjectToString(dart::Object& obj, bool simpleForm, bool 
 			txt += ']';
 		}
 		//arr.ElementSizeInBytes();
-		return std::format("{}({}) {}", app.GetClass(cid)->Name(), arr_len, txt);
+		return fmt::format("{}({}) {}", app.GetClass(cid)->Name(), arr_len, txt);
 	}
 
 	switch (cid) {
 	case dart::kSmiCid:
 		if (simpleForm || depth > 0)
-			return std::format("{:#x}", dart::Smi::Cast(obj).Value());
-		return std::format("Smi: {:#x}", dart::Smi::Cast(obj).Value());
+			return fmt::format("{:#x}", dart::Smi::Cast(obj).Value());
+		return fmt::format("Smi: {:#x}", dart::Smi::Cast(obj).Value());
 	case dart::kMintCid:
 		if (simpleForm || depth > 0)
-			return std::format("{:#x}", dart::Mint::Cast(obj).value());
-		return std::format("Mint: {:#x}", dart::Mint::Cast(obj).value());
+			return fmt::format("{:#x}", dart::Mint::Cast(obj).value());
+		return fmt::format("Mint: {:#x}", dart::Mint::Cast(obj).value());
 	case dart::kDoubleCid:
 		if (simpleForm || depth > 0)
-			return std::format("{}", dart::Double::Cast(obj).value());
-		return std::format("Double: {}", dart::Double::Cast(obj).value());
+			return fmt::format("{}", dart::Double::Cast(obj).value());
+		return fmt::format("Double: {}", dart::Double::Cast(obj).value());
 	case dart::kBoolCid:
 		return dart::Bool::Cast(obj).value() ? "true" : "false";
 	case dart::kNullCid:
@@ -519,35 +519,35 @@ std::string DartDumper::ObjectToString(dart::Object& obj, bool simpleForm, bool 
 			auto parentFn = dartFn->GetOutermostFunction();
 			if (parentFn) {
 				// AOT anonymous closure contains only static information
-				return std::format("AnonymousClosure: {}({:#x}), in {} ({:#x})",
+				return fmt::format("AnonymousClosure: {}({:#x}), in {} ({:#x})",
 					dartFn->IsStatic() ? "static " : "", dartFn->Address(),
 					parentFn->FullName(), parentFn->Address());
 			}
 			else {
-				return std::format("AnonymousClosure: {}({:#x}), of {}",
+				return fmt::format("AnonymousClosure: {}({:#x}), of {}",
 					dartFn->IsStatic() ? "static " : "", dartFn->Address(),
 					dartFn->Class().FullNameWithPackage());
 			}
 		}
-		return std::format("Function: {} ({:#x})", dartFn->FullName(), dartFn->Address());
+		return fmt::format("Function: {} ({:#x})", dartFn->FullName(), dartFn->Address());
 	}
 	case dart::kClosureCid: {
 		// TODO: show owner
 		const auto& closure = dart::Closure::Cast(obj);
 		if (!app.functions.contains(closure.entry_point() - app.base())) {
-			std::cout << std::format("[!] missing closure at {:#x}\n", closure.entry_point() - app.base());
+			std::cout << fmt::format("[!] missing closure at {:#x}\n", closure.entry_point() - app.base());
 		}
 		//RELEASE_ASSERT(app.functions.contains(closure.entry_point() - app.base()));
-		return std::format("{} ({:#x})", closure.ToCString(), closure.entry_point());
+		return fmt::format("{} ({:#x})", closure.ToCString(), closure.entry_point());
 	}
 	case dart::kCodeCid: {
 		const auto& code = dart::Code::Cast(obj);
 		const auto ep = code.EntryPoint() - app.base();
 		if (app.stubs.contains(ep)) {
 			const auto stub = app.stubs[ep];
-			return std::format("Stub: {} ({:#x})", stub->Name().c_str(), ep);
+			return fmt::format("Stub: {} ({:#x})", stub->Name().c_str(), ep);
 		}
-		return std::format("Code: {} ({:#x})", code.ToCString(), ep);
+		return fmt::format("Code: {} ({:#x})", code.ToCString(), ep);
 	}
 	case dart::kImmutableArrayCid: {
 		// Objects in Object Pool immutable, so only immutable array is used for array
@@ -557,7 +557,7 @@ std::string DartDumper::ObjectToString(dart::Object& obj, bool simpleForm, bool 
 		const auto typeArg = app.typeDb->FindOrAdd(arr.GetTypeArguments());
 		// without type arguments, assume it is argument descriptor. show it even simple form is true.
 		if (simpleForm && typeArg->Length() > 0)
-			return std::format("List{}({})", typeArg->ToString(), arr_len);
+			return fmt::format("List{}({})", typeArg->ToString(), arr_len);
 
 		std::ostringstream ss;
 		if (arr_len > 0) {
@@ -578,7 +578,7 @@ std::string DartDumper::ObjectToString(dart::Object& obj, bool simpleForm, bool 
 				arrPtr++;
 			}
 		}
-		return std::format("List{}({}) [{}]", typeArg->ToString(), arr_len, ss.str());
+		return fmt::format("List{}({}) [{}]", typeArg->ToString(), arr_len, ss.str());
 	}
 #ifdef HAS_RECORD_TYPE
 	case dart::kRecordCid: {
@@ -614,20 +614,20 @@ std::string DartDumper::ObjectToString(dart::Object& obj, bool simpleForm, bool 
 #endif
 	case dart::kTypeParametersCid:
 		// might be in a Type but not in Object Pool directly
-		return std::format("{} (ptr: {:#x})", obj.ToCString(), (uint64_t)obj.ptr());
+		return fmt::format("{} (ptr: {:#x})", obj.ToCString(), (uint64_t)obj.ptr());
 	case dart::kFieldCid: {
 		const auto& field = dart::Field::Cast(obj);
-		return std::format("{} (offset: {:#x})", field.ToCString(), field.TargetOffset());
+		return fmt::format("{} (offset: {:#x})", field.ToCString(), field.TargetOffset());
 	}
 	case dart::kConstMapCid: {
 		auto& map = dart::Map::Cast(obj);
 		const auto typeArg = app.typeDb->FindOrAdd(map.GetTypeArguments());
 		if (simpleForm)
-			return std::format("Map{}({})", typeArg->ToString(), map.Length());
+			return fmt::format("Map{}({})", typeArg->ToString(), map.Length());
 
 		std::ostringstream ss;
 		std::string indent(depth * 2 + 2, ' ');
-		ss << std::format("Map{}({}) {{\n", typeArg->ToString(), map.Length());
+		ss << fmt::format("Map{}({}) {{\n", typeArg->ToString(), map.Length());
 		dart::Map::Iterator iter(map);
 		auto& key = dart::Object::Handle();
 		auto& val = dart::Object::Handle();
@@ -647,10 +647,10 @@ std::string DartDumper::ObjectToString(dart::Object& obj, bool simpleForm, bool 
 		auto& set = dart::Set::Cast(obj);
 		const auto typeArg = app.typeDb->FindOrAdd(set.GetTypeArguments());
 		if (simpleForm)
-			return std::format("Set{}({})", typeArg->ToString(), set.Length());
+			return fmt::format("Set{}({})", typeArg->ToString(), set.Length());
 
 		std::ostringstream ss;
-		ss << std::format("Set{}({}) {{ ", typeArg->ToString(), set.Length());
+		ss << fmt::format("Set{}({}) {{ ", typeArg->ToString(), set.Length());
 		dart::Set::Iterator iter(set);
 		auto& key = dart::Object::Handle();
 		int cnt = 0;
@@ -675,10 +675,10 @@ std::string DartDumper::ObjectToString(dart::Object& obj, bool simpleForm, bool 
 		const auto& ns = dart::Namespace::Cast(importObj);
 		const auto& lib = dart::Library::Handle(ns.target());
 		const auto& libName = dart::String::Handle(lib.url());
-		return std::format("LibraryPrefix: {}, target lib: {} ({})", name.ToCString(), libName.ToCString(), lib.toplevel_class().untag()->id());
+		return fmt::format("LibraryPrefix: {}, target lib: {} ({})", name.ToCString(), libName.ToCString(), lib.toplevel_class().untag()->id());
 	}
 	case dart::kInstanceCid:
-		return std::format("Obj!Object@{:x}", (uint32_t)(intptr_t)obj.ptr());
+		return fmt::format("Obj!Object@{:x}", (uint32_t)(intptr_t)obj.ptr());
 	// TODO: enum subclass
 	}
 
@@ -705,7 +705,7 @@ std::string DartDumper::dumpInstance(dart::Object& obj, bool simpleForm, bool ne
 	const auto ptr = dart::UntaggedObject::ToAddr(obj.ptr());
 	DartType* dtype = app.typeDb->FindOrAdd(*dartCls, dart::Instance::Cast(obj));
 	if (simpleForm || (!nestedObj && depth > 0)) {
-		return std::format("Obj!{}@{:x}", dtype->ToString(), (uint32_t)(intptr_t)obj.ptr());
+		return fmt::format("Obj!{}@{:x}", dtype->ToString(), (uint32_t)(intptr_t)obj.ptr());
 	}
 
 	std::vector<DartClass*> parents;
@@ -717,7 +717,7 @@ std::string DartDumper::dumpInstance(dart::Object& obj, bool simpleForm, bool ne
 
 	std::ostringstream ss;
 	int fieldCnt = 0;
-	ss << std::format("Obj!{}@{:x} : {{\n", dtype->ToString(), (uint32_t)(intptr_t)obj.ptr());
+	ss << fmt::format("Obj!{}@{:x} : {{\n", dtype->ToString(), (uint32_t)(intptr_t)obj.ptr());
 	auto offset = dart::Instance::NextFieldOffset();
 	for (auto parent : parents | std::views::reverse) {
 		if (offset < parent->Size()) {
@@ -764,10 +764,10 @@ std::string DartDumper::dumpInstanceFields(dart::Object& obj, DartClass& dartCls
 			auto p = reinterpret_cast<uint64_t*>(ptr + offset);
 			// it is rare to find integer that larger than 0x1000_0000_0000_0000
 			if (*p <= 0x1000000000000000 || *p >= 0xffffffffffff0000) {
-				txtField = std::format("off_{:x}: int({:#x})", offset, *p);
+				txtField = fmt::format("off_{:x}: int({:#x})", offset, *p);
 			}
 			else {
-				txtField = std::format("off_{:x}: double({})", offset, *((double*)p));
+				txtField = fmt::format("off_{:x}: double({})", offset, *((double*)p));
 			}
 			offset += dart::kCompressedWordSize;
 		}
@@ -780,14 +780,14 @@ std::string DartDumper::dumpInstanceFields(dart::Object& obj, DartClass& dartCls
 					if (objPtr2 != nullptr && objPtr2.GetClassId() != dart::kNullCid) {
 						obj = objPtr2;
 						if (simpleForm || objPtr2.GetClassId() < dart::kNumPredefinedCids)
-							txtField = std::format("off_{:x}: {}", offset, ObjectToString(obj, simpleForm, nestedObj, depth));
+							txtField = fmt::format("off_{:x}: {}", offset, ObjectToString(obj, simpleForm, nestedObj, depth));
 						else
-							txtField = std::format("off_{:x}_{}", offset, ObjectToString(obj, simpleForm, nestedObj, depth));
+							txtField = fmt::format("off_{:x}_{}", offset, ObjectToString(obj, simpleForm, nestedObj, depth));
 					}
 				}
 				else {
 					obj = p->DecompressSmi();
-					txtField = std::format("off_{:x}_Smi: {:#x}", offset, dart::Smi::Cast(obj).Value());
+					txtField = fmt::format("off_{:x}_Smi: {:#x}", offset, dart::Smi::Cast(obj).Value());
 				}
 			}
 		}
@@ -815,17 +815,17 @@ std::string DartDumper::getPoolObjectDescription(intptr_t offset, bool simpleFor
 			ASSERT(pool.TypeAt(idx + 1) == dart::ObjectPool::EntryType::kImmediate);
 			const auto imm = pool.RawValueAt(idx + 1);
 			auto dartFn = app.GetFunction(imm - app.base());
-			return std::format("[pp+{:#x}] UnlinkedCall: {:#x} - {}", offset, dartFn->Address(), dartFn->FullName().c_str());
+			return fmt::format("[pp+{:#x}] UnlinkedCall: {:#x} - {}", offset, dartFn->Address(), dartFn->FullName().c_str());
 		}
-		return std::format("[pp+{:#x}] {}", offset, ObjectToString(obj, simpleForm));
+		return fmt::format("[pp+{:#x}] {}", offset, ObjectToString(obj, simpleForm));
 	}
 	else if (objType == dart::ObjectPool::EntryType::kImmediate) {
 		dart::uword imm = pool.RawValueAt(idx);
 		if (imm <= 0x1000000000000000 || imm >= 0xffffffffffff0000) {
-			return std::format("[pp+{:#x}] IMM: {:#x}", offset, imm);
+			return fmt::format("[pp+{:#x}] IMM: {:#x}", offset, imm);
 		}
 		else {
-			return std::format("[pp+{:#x}] IMM: double({}) from {:#x}", offset, *((double*)&imm), imm);
+			return fmt::format("[pp+{:#x}] IMM: double({}) from {:#x}", offset, *((double*)&imm), imm);
 		}
 	}
 	else if (objType == dart::ObjectPool::EntryType::kNativeFunction) {
@@ -833,16 +833,16 @@ std::string DartDumper::getPoolObjectDescription(intptr_t offset, bool simpleFor
 		uintptr_t start = 0;
 		char* name = dart::NativeSymbolResolver::LookupSymbolName(pc, &start);
 		if (name != NULL) {
-			auto txt = std::format("[pp+{:#x}] NativeFn: {} at {:#x}", offset, name, pc);
+			auto txt = fmt::format("[pp+{:#x}] NativeFn: {} at {:#x}", offset, name, pc);
 			dart::NativeSymbolResolver::FreeSymbolName(name);
 			return txt;
 		}
 		else {
-			return std::format("[pp+{:#x}] NativeFn: [no name] at {:#x}", offset, pc);
+			return fmt::format("[pp+{:#x}] NativeFn: [no name] at {:#x}", offset, pc);
 		}
 	}
 	else {
-		throw std::runtime_error(std::format("unknown pool object type: {}", (int)objType).c_str());
+		throw std::runtime_error(fmt::format("unknown pool object type: {}", (int)objType).c_str());
 	}
 }
 
@@ -854,7 +854,7 @@ void DartDumper::DumpObjectPool(const char* filename)
 
 	const auto& rawObj = pool.ptr()->untag();
 	const auto raw_addr = dart::UntaggedObject::ToAddr(rawObj);
-	of << std::format("pool heap offset: {:#x}\n", raw_addr - app.heap_base());
+	of << fmt::format("pool heap offset: {:#x}\n", raw_addr - app.heap_base());
 
 	for (intptr_t i = 0; i < num; i++) {
 		// offset here is from ObjectPool pointer subtracted by kHeapObjectTag

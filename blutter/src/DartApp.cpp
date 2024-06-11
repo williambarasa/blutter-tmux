@@ -361,7 +361,7 @@ DartFunction* DartApp::addFunctionNoCheck(const dart::Function& func)
 	else {
 		cls = classes[cid];
 		if (cls == NULL) {
-			auto msg = std::format("found invalid class id: {}", cid);
+			auto msg = fmt::format("found invalid class id: {}", cid);
 			throw std::runtime_error(msg);
 		}
 	}
@@ -411,7 +411,7 @@ void DartApp::findFunctionInHeap()
 		if ((intptr_t)owner == (intptr_t)dart::Object::null()) {
 			ASSERT(code.IsStubCode());
 			if (!stubs.contains(ep_offset)) {
-				//std::cout << std::format("unknown stub at: {:#x}, {}, size: {}\n", ep_offset, code.ToCString(), code.Size());
+				//std::cout << fmt::format("unknown stub at: {:#x}, {}, size: {}\n", ep_offset, code.ToCString(), code.Size());
 				auto stub_size = code.Size();
 				DartStub* candidateStub = nullptr;
 				std::vector<DartStub*> candidateStubs;
@@ -446,7 +446,7 @@ void DartApp::findFunctionInHeap()
 						}
 					}
 				}
-				//std::cout << std::format("unknown stub at: {:#x}, map to {}\n", ep_offset, candidateStub->Name());
+				//std::cout << fmt::format("unknown stub at: {:#x}, map to {}\n", ep_offset, candidateStub->Name());
 				ASSERT(candidateStub);
 				stubs[ep_offset] = new DartStub(code_ptr, candidateStub->kind, ep_offset, stub_size, candidateStub->Name());
 			}
@@ -469,10 +469,10 @@ void DartApp::findFunctionInHeap()
 			if (!obj.IsType()) {
 #ifdef HAS_RECORD_TYPE
 				if (!obj.IsRecordType()) {
-					std::cerr << std::format("TestType is not for Type or RecordType, but for {}\n", classes[obj.GetClassId()]->Name());
+					std::cerr << fmt::format("TestType is not for Type or RecordType, but for {}\n", classes[obj.GetClassId()]->Name());
 				}
 #else
-				std::cerr << std::format("TestType is not for Type, but for {}\n", classes[obj.GetClassId()]->Name());
+				std::cerr << fmt::format("TestType is not for Type, but for {}\n", classes[obj.GetClassId()]->Name());
 #endif
 			}
 			if (stubs.contains(ep_offset))
@@ -501,7 +501,7 @@ void DartApp::findFunctionInHeap()
 			}
 		}
 		else {
-			auto msg = std::format("[!] unknown code at: {:#x}, {}\n", ep_offset, obj.ToCString());
+			auto msg = fmt::format("[!] unknown code at: {:#x}, {}\n", ep_offset, obj.ToCString());
 			std::cout << msg;
 			std::cout << "  !!! Unhandle case. Please report with your APK\n";
 			//throw std::runtime_error(msg);
@@ -712,7 +712,7 @@ void DartApp::walkObject(dart::Object& obj)
 			else {
 				dartCls->AddField(offset, typeDb->Get(dart::kDoubleCid));
 			}
-			//std::cout << std::format("    offset_{:x} : int({:#x})\n", offset, *p);
+			//std::cout << fmt::format("    offset_{:x} : int({:#x})\n", offset, *p);
 			offset += dart::kCompressedWordSize * 2;
 		}
 		else {

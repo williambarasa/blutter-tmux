@@ -73,7 +73,7 @@ static VarValue* getPoolObject(DartApp& app, intptr_t offset, A64::Register dstR
 		if (obj.IsTypedData()) {
 			//dart::kTypedDataInt32ArrayCid;
 			//auto& data = dart::TypedData::Cast(obj);
-			return new VarExpression(std::format("{}", obj.ToCString()), (int32_t)obj.GetClassId());
+			return new VarExpression(fmt::format("{}", obj.ToCString()), (int32_t)obj.GetClassId());
 		}
 
 		switch (obj.GetClassId()) {
@@ -110,12 +110,12 @@ static VarValue* getPoolObject(DartApp& app, intptr_t offset, A64::Register dstR
 			// TODO: map
 		case dart::kConstSetCid:
 			// TODO: set
-			return new VarExpression(std::format("{}", obj.ToCString()), (int32_t)obj.GetClassId());
+			return new VarExpression(fmt::format("{}", obj.ToCString()), (int32_t)obj.GetClassId());
 #ifdef HAS_RECORD_TYPE
 		case dart::kRecordCid: {
 			// temporary expression for Record object (need full object for analysis)
 			//const auto& rec = dart::Record::Cast(obj);
-			return new VarExpression(std::format("{}", obj.ToCString()), (int32_t)obj.GetClassId());
+			return new VarExpression(fmt::format("{}", obj.ToCString()), (int32_t)obj.GetClassId());
 		}
 #endif
 		case dart::kTypeParametersCid:
@@ -153,13 +153,13 @@ static VarValue* getPoolObject(DartApp& app, intptr_t offset, A64::Register dstR
 		if (obj.IsInstance()) {
 			auto dartCls = app.GetClass(obj.GetClassId());
 			if (dartCls->Id() < dart::kNumPredefinedCids) {
-				std::cerr << std::format("Unhandle predefined class {} ({})\n", dartCls->Name(), dartCls->Id());
+				std::cerr << fmt::format("Unhandle predefined class {} ({})\n", dartCls->Name(), dartCls->Id());
 			}
 			return new VarInstance(dartCls);
 		}
 
 		throw std::runtime_error("unhandle object class in getPoolObject");
-		//auto txt = std::format("XXX: {}", obj.ToCString());
+		//auto txt = fmt::format("XXX: {}", obj.ToCString());
 		//return new VarExpression(txt);
 	}
 	else if (objType == dart::ObjectPool::EntryType::kImmediate) {
@@ -173,7 +173,7 @@ static VarValue* getPoolObject(DartApp& app, intptr_t offset, A64::Register dstR
 		throw std::runtime_error("getting native function pool object from Dart code");
 	}
 	else {
-		throw std::runtime_error(std::format("unknown pool object type: {}", (int)objType).c_str());
+		throw std::runtime_error(fmt::format("unknown pool object type: {}", (int)objType).c_str());
 	}
 }
 
@@ -409,13 +409,13 @@ void FunctionAnalyzer::printInsnException(InsnException& e)
 		--ins;
 	}
 	while (ins != e.insn) {
-		std::cerr << std::format("    {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
+		std::cerr << fmt::format("    {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
 		++ins;
 	}
-	std::cerr << std::format("  * {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
+	std::cerr << fmt::format("  * {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
 	if (ins->address + ins->size < fnInfo->dartFn.AddressEnd()) {
 		++ins;
-		std::cerr << std::format("    {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
+		std::cerr << fmt::format("    {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
 	}
 }
 
@@ -760,7 +760,7 @@ void FunctionAnalyzer::handlePrologue(AsmIterator& insn, uint64_t endPrologueAdd
 
 	// below check is very useful for checking analyzing prologue because it is correct in most case
 	if (hasPrologue && endPrologueAddr != 0 && endPrologueAddr != insn.address()) {
-		//std::cerr << std::format("endPrologueAddr != insn.address(), {:#x} != {:#x}\n", endPrologueAddr, insn.address());
+		//std::cerr << fmt::format("endPrologueAddr != insn.address(), {:#x} != {:#x}\n", endPrologueAddr, insn.address());
 	}
 
 	// Dart always check stack overflow if allocating stack instruction is emitted
@@ -1661,7 +1661,7 @@ std::unique_ptr<SetupParametersInstr> FunctionAnalyzer::processPrologueParameter
 				++insn;
 			}
 			else if (insn.id() == ARM64_INS_LDUR && insn.ops(1).mem.base == CSREG_ARGS_DESC) {
-				//std::cout << std::format("  !!! use ArgsDesc directory without moving !!! at {:#x}\n", insn.address());
+				//std::cout << fmt::format("  !!! use ArgsDesc directory without moving !!! at {:#x}\n", insn.address());
 				argsDescReg = CSREG_ARGS_DESC;
 			}
 			if (argsDescReg != ARM64_REG_INVALID)
@@ -1939,9 +1939,9 @@ std::unique_ptr<SetupParametersInstr> FunctionAnalyzer::processPrologueParameter
 			else {
 				auto val = fnInfo->State()->GetValue(srcReg);
 				if (val == nullptr) {
-					//std::cout << std::format("Cannot find define of srcReg\n");
+					//std::cout << fmt::format("Cannot find define of srcReg\n");
 					//auto ins = insn.Current() - 1;
-					//std::cout << std::format("  {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
+					//std::cout << fmt::format("  {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
 					INSN_ASSERT(dartFn->IsClosure() || needSuspendState);
 					val = addRegisterFunctionParameter(srcReg);
 				}

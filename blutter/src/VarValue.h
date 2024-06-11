@@ -214,7 +214,7 @@ struct VarGrowableArray : public VarValue {
 
 struct VarUnlinkedCall : public VarValue {
 	explicit VarUnlinkedCall(DartStub& stub) : VarValue(dart::kUnlinkedCallCid, true), stub(stub) {}
-	virtual std::string ToString() { return std::format("UnlinkedCall_{:#x}", stub.Address()); }
+	virtual std::string ToString() { return fmt::format("UnlinkedCall_{:#x}", stub.Address()); }
 
 	DartStub& stub;
 };
@@ -224,7 +224,7 @@ struct VarInstance : public VarValue {
 	explicit VarInstance(DartClass* cls) : VarValue(dart::kInstanceCid, true), cls(cls) {}
 	explicit VarInstance() : VarValue(dart::kInstanceCid, false), cls(nullptr) {}
 	virtual ValueType TypeId() { return cls->Id(); }
-	virtual std::string ToString() { return std::format("Instance_{}", cls->Name()); }
+	virtual std::string ToString() { return fmt::format("Instance_{}", cls->Name()); }
 
 	DartClass* cls;
 	//TODO: TypeArguments;
@@ -283,7 +283,7 @@ struct VarSubtypeTestCache : public VarValue {
 struct VarCid : public VarValue {
 	explicit VarCid(int cid, bool isSmi) : VarValue(dart::kClassCid, cid != 0), isSmi(isSmi), cid(cid) {}
 	explicit VarCid() : VarValue(dart::kClassCid, false), isSmi(false), cid(0) {}
-	virtual std::string ToString() { return isSmi ? std::format("TaggedCid_{}", cid >> dart::kSmiTagSize) : std::format("cid_{}", cid); }
+	virtual std::string ToString() { return isSmi ? fmt::format("TaggedCid_{}", cid >> dart::kSmiTagSize) : fmt::format("cid_{}", cid); }
 
 	bool isSmi;
 	int cid;

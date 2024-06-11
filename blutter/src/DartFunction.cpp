@@ -80,11 +80,11 @@ DartFunction::DartFunction(DartClass& cls, const dart::FunctionPtr ptr) : DartFn
 	ep_addr = code.EntryPoint() - lib_base;
 	if (ep != ep_addr) {
 		ep_addr = ep;
-		//std::cout << std::format("Fn: {}, payload: {:#x}, ep_addr: {:#x}, ep: {:#x}\n", name.c_str(), payload_addr, ep_addr, ep);
+		//std::cout << fmt::format("Fn: {}, payload: {:#x}, ep_addr: {:#x}, ep: {:#x}\n", name.c_str(), payload_addr, ep_addr, ep);
 	}
 
 	//if (ep_addr != payload_addr) {
-	//	std::cout << std::format("Fn: {}, payload: {:#x}, morphic: {:#x}, ep: {:#x}\n", name.c_str(), payload_addr, morphic_addr, ep_addr);
+	//	std::cout << fmt::format("Fn: {}, payload: {:#x}, morphic: {:#x}, ep: {:#x}\n", name.c_str(), payload_addr, morphic_addr, ep_addr);
 	//}
 
 	// closure parent (what function use this closure)
@@ -100,7 +100,7 @@ DartFunction::DartFunction(DartClass& cls, const dart::FunctionPtr ptr) : DartFn
 			parent = (DartFunction*)(intptr_t)parentPtr;
 		}
 		else {
-			//std::cout << std::format("[?] closure {} ({:#x}) has null parent\n", name, ep_addr);
+			//std::cout << fmt::format("[?] closure {} ({:#x}) has null parent\n", name, ep_addr);
 		}
 	}
 
@@ -190,12 +190,12 @@ std::string DartFunction::ToCallStatement(const std::vector<std::shared_ptr<VarI
 			callFn = args[0]->CallArgName() + "." + Name();
 		}
 	}
-	return std::format("{}({})", callFn.c_str(), callArgs.c_str());
+	return fmt::format("{}({})", callFn.c_str(), callArgs.c_str());
 }
 
 void DartFunction::PrintHead(std::ostream& of) const
 {
-	//of << std::format("    {} /* addr: {:#x}, size: {:#x} */\n", func.ToCString(), ep, code_size);
+	//of << fmt::format("    {} /* addr: {:#x}, size: {:#x} */\n", func.ToCString(), ep, code_size);
 	auto zone = dart::Thread::Current()->zone();
 	auto& func = dart::Function::Handle(zone, ptr);
 
@@ -259,7 +259,7 @@ void DartFunction::PrintHead(std::ostream& of) const
 	}
 	of << " {\n";
 
-	of << std::format("    // ** addr: {:#x}, size: {:#x}\n", ep_addr, size);
+	of << fmt::format("    // ** addr: {:#x}, size: {:#x}\n", ep_addr, size);
 }
 
 void DartFunction::PrintFoot(std::ostream& of) const

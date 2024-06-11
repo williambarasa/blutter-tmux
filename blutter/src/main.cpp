@@ -27,8 +27,8 @@ int main(int argc, char** argv)
 		}
 
 		DartApp app{ libappPath.c_str() };
-		std::cout << std::format("libapp is loaded at {:#x}\n", app.base());
-		std::cout << std::format("Dart heap at {:#x}\n", app.heap_base());
+		std::cout << fmt::format("libapp is loaded at {:#x}\n", app.base());
+		std::cout << fmt::format("Dart heap at {:#x}\n", app.heap_base());
 
 		app.EnterScope();
 		app.LoadInfo();

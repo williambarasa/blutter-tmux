@@ -119,5 +119,5 @@ std::string DartLibrary::CreatePath(const char* base_dir)
 
 void DartLibrary::PrintCommentInfo(std::ostream& of)
 {
-	of << std::format("// lib: {}, url: {}\n", name.c_str(), url.c_str());
+	of << fmt::format("// lib: {}, url: {}\n", name.c_str(), url.c_str());
 }

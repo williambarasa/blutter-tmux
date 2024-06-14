@@ -38,7 +38,7 @@ include(sourcelist.cmake)
 list(TRANSFORM SRCS PREPEND "${SRCDIR}/")
 add_executable(${BINNAME} ${SRCS})
 
-target_link_libraries(${BINNAME} ${DARTLIB} capstone)
+target_link_libraries(${BINNAME} PRIVATE ${DARTLIB} capstone)
 
 if (ANDROID)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -llog")
@@ -47,6 +47,8 @@ endif()
 target_precompile_headers(${BINNAME} PRIVATE "${SRCDIR}/pch.h")
 
 if (MSVC)
+	# for dynamic function (exception) table
+	target_link_libraries(${BINNAME} PRIVATE ntdll)
 	# remove compiler exception handler options
 	#string(REPLACE "/EHsc" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
 	# remove compiler RTTI option
@@ -97,6 +99,9 @@ if (NO_INIT_LATE_STATIC_FIELD)
 endif()
 if (NO_CODE_ANALYSIS)
 	set(defines ${defines} NO_CODE_ANALYSIS)
+endif()
+if (NO_METHOD_EXTRACTOR_STUB)
+	set(defines ${defines} NO_METHOD_EXTRACTOR_STUB)
 endif()
 target_compile_definitions(${BINNAME} PRIVATE ${defines})
 

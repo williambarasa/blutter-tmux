@@ -13,9 +13,8 @@ For high priority missing features, see [TODO](#todo)
 - Same as debian but needs ndk . if you dont want ndk then remove android library dependencies related files in dartsdk
 - I actually liked [fmt](https://github.com/fmtlib/fmt.git) library thats the main reason replaced standard format
 - Install `fmt`: `pkg install fmt`
-- you need to replace all occurance of std::format with fmt
+- In case you face errors related to `no member named 'format'`, you need to replace all occurance of std::format with fmt
   ```find -type f -exec sed -i 's/std::format/fmt::format/g' {} +```
-  - This can be done `pre` by me in the repo also but considering future sync with main blutter repo and keep conflicts less i avoided doing so.
 - It should work for both dartsdk stable/beta builds didnt checked for dev builds
 - If any error related to capstone first check if is present in include dir  
     ```pkg-config --cflags capstone```

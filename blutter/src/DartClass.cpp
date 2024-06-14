@@ -111,11 +111,11 @@ DartClass::DartClass(const DartLibrary& lib_, const dart::Class& cls) :
 	//			}
 	//			else if (id == dart::kDoubleCid) {
 	//				auto val = dart::Double::Cast(obj).value();
-	//				//std::cout << std::format("  const double: {}\n", val);
+	//				//std::cout << fmt::format("  const double: {}\n", val);
 	//			}
 	//			else if (id == dart::kMintCid) {
 	//				auto val = dart::Mint::Cast(obj).value();
-	//				//std::cout << std::format("  const Mint: {:#x}\n", val);
+	//				//std::cout << fmt::format("  const Mint: {:#x}\n", val);
 	//			}
 	//			else if (id == dart::kConstMapCid) {
 	//				auto& map = dart::Map::Cast(obj);
@@ -209,15 +209,15 @@ std::string DartClass::FullNameWithPackage() const
 void DartClass::PrintHead(std::ostream& of)
 {
 	if (superCls == NULL)
-		of << std::format("\n// class id: {}, size: {:#x}\n", id, size);
+		of << fmt::format("\n// class id: {}, size: {:#x}\n", id, size);
 	else
-		of << std::format("\n// class id: {}, size: {:#x}, field offset: {:#x}\n", id, size, superCls->size);
+		of << fmt::format("\n// class id: {}, size: {:#x}, field offset: {:#x}\n", id, size, superCls->size);
 	if (dart::ClassTable::IsTopLevelCid(id)) {
 		of << "class :: {\n";
 		return;
 	}
 	if (superCls == NULL) {
-		of << std::format("class {};\n", name.c_str());
+		of << fmt::format("class {};\n", name.c_str());
 		return;
 	}
 

@@ -73,7 +73,7 @@ static VarValue* getPoolObject(DartApp& app, intptr_t offset, A64::Register dstR
 		if (obj.IsTypedData()) {
 			//dart::kTypedDataInt32ArrayCid;
 			//auto& data = dart::TypedData::Cast(obj);
-			return new VarExpression(std::format("{}", obj.ToCString()), (int32_t)obj.GetClassId());
+			return new VarExpression(fmt::format("{}", obj.ToCString()), (int32_t)obj.GetClassId());
 		}
 
 		switch (obj.GetClassId()) {
@@ -110,12 +110,12 @@ static VarValue* getPoolObject(DartApp& app, intptr_t offset, A64::Register dstR
 			// TODO: map
 		case dart::kConstSetCid:
 			// TODO: set
-			return new VarExpression(std::format("{}", obj.ToCString()), (int32_t)obj.GetClassId());
+			return new VarExpression(fmt::format("{}", obj.ToCString()), (int32_t)obj.GetClassId());
 #ifdef HAS_RECORD_TYPE
 		case dart::kRecordCid: {
 			// temporary expression for Record object (need full object for analysis)
 			//const auto& rec = dart::Record::Cast(obj);
-			return new VarExpression(std::format("{}", obj.ToCString()), (int32_t)obj.GetClassId());
+			return new VarExpression(fmt::format("{}", obj.ToCString()), (int32_t)obj.GetClassId());
 		}
 #endif
 		case dart::kTypeParametersCid:
@@ -153,13 +153,13 @@ static VarValue* getPoolObject(DartApp& app, intptr_t offset, A64::Register dstR
 		if (obj.IsInstance()) {
 			auto dartCls = app.GetClass(obj.GetClassId());
 			if (dartCls->Id() < dart::kNumPredefinedCids) {
-				std::cerr << std::format("Unhandle predefined class {} ({})\n", dartCls->Name(), dartCls->Id());
+				std::cerr << fmt::format("Unhandle predefined class {} ({})\n", dartCls->Name(), dartCls->Id());
 			}
 			return new VarInstance(dartCls);
 		}
 
 		throw std::runtime_error("unhandle object class in getPoolObject");
-		//auto txt = std::format("XXX: {}", obj.ToCString());
+		//auto txt = fmt::format("XXX: {}", obj.ToCString());
 		//return new VarExpression(txt);
 	}
 	else if (objType == dart::ObjectPool::EntryType::kImmediate) {
@@ -173,7 +173,7 @@ static VarValue* getPoolObject(DartApp& app, intptr_t offset, A64::Register dstR
 		throw std::runtime_error("getting native function pool object from Dart code");
 	}
 	else {
-		throw std::runtime_error(std::format("unknown pool object type: {}", (int)objType).c_str());
+		throw std::runtime_error(fmt::format("unknown pool object type: {}", (int)objType).c_str());
 	}
 }
 
@@ -409,13 +409,13 @@ void FunctionAnalyzer::printInsnException(InsnException& e)
 		--ins;
 	}
 	while (ins != e.insn) {
-		std::cerr << std::format("    {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
+		std::cerr << fmt::format("    {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
 		++ins;
 	}
-	std::cerr << std::format("  * {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
+	std::cerr << fmt::format("  * {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
 	if (ins->address + ins->size < fnInfo->dartFn.AddressEnd()) {
 		++ins;
-		std::cerr << std::format("    {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
+		std::cerr << fmt::format("    {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
 	}
 }
 
@@ -516,7 +516,8 @@ std::unique_ptr<CallLeafRuntimeInstr> FunctionAnalyzer::processCallLeafRuntime(A
 	// CCallInstr::EmitNativeCode()
 	if (insn.id() == ARM64_INS_AND && insn.ops(0).reg == CSREG_DART_SP && insn.ops(1).reg == CSREG_DART_SP && insn.ops(2).imm == 0xfffffffffffffff0) {
 		// previous IL must be EnterFrame
-		INSN_ASSERT(fnInfo->LastIL()->Kind() == ILInstr::EnterFrame);
+		//INSN_ASSERT(fnInfo->LastIL()->Kind() == ILInstr::EnterFrame);
+		// TODO: THR::call_native_through_safepoint_entry_point case and merge AllocStack IL to EnterFrame IL
 		if (fnInfo->LastIL()->Kind() == ILInstr::EnterFrame) {
 			InsnMarker marker(insn);
 			++insn;
@@ -572,85 +573,94 @@ std::unique_ptr<CallLeafRuntimeInstr> FunctionAnalyzer::processCallLeafRuntime(A
 		}
 	}
 	// weird case
-	else if (insn.id() == ARM64_INS_MOV && insn.ops(1).reg == CSREG_DART_THR) {
-		const auto tmp_reg = insn.ops(0).reg;
+	// it should be easier to detect THR register if varaible tracking is fully implemented
+	else if ((insn.id() == ARM64_INS_MOV && insn.ops(1).reg == CSREG_DART_THR) || 
+		(insn.id() == ARM64_INS_LDR && GetThreadLeafFunction(insn.ops(1).mem.disp) && insn.ops(1).mem.base != CSREG_DART_PP && insn.ops(1).mem.disp > dart::Thread::AllocateHandle_entry_point_offset()))
+	{
 		InsnMarker marker(insn);
+
+		if (insn.id() == ARM64_INS_MOV) {
+			const auto tmp_reg = insn.ops(0).reg;
+			++insn;
+
+			if (!(insn.id() == ARM64_INS_LDR && insn.ops(1).mem.base == tmp_reg)) {
+				return nullptr;
+			}
+		}
+
+		// LDR instruction
+		const auto thr_offset = insn.ops(1).mem.disp;
+		const A64::Register tmp_target_reg = insn.ops(0).reg;
 		++insn;
 
-		if (insn.id() == ARM64_INS_LDR && insn.ops(1).mem.base == tmp_reg) {
-			const auto thr_offset = insn.ops(1).mem.disp;
-			const A64::Register tmp_target_reg = insn.ops(0).reg;
-			++insn;
+		INSN_ASSERT(GetThreadLeafFunction(thr_offset));
 
-			INSN_ASSERT(GetThreadLeafFunction(thr_offset));
-
-			std::vector<std::unique_ptr<MoveRegInstr>> movILs;
-			while (true) {
-				auto il = processMoveRegInstr(insn);
-				INSN_ASSERT(il);
-				if (il->srcReg == A64::Register::FP) {
-					INSN_ASSERT(il->dstReg == A64::Register::TMP2);
-					break;
-				}
-				else if (il->srcReg == tmp_target_reg) {
-					INSN_ASSERT(il->dstReg == A64::Register::R9);
-					//const auto call_target_reg = insn.ops(0).reg;
-				}
-				else {
-					// moving for setting up call paramaeters
-					movILs.push_back(std::move(il));
-				}
+		std::vector<std::unique_ptr<MoveRegInstr>> movILs;
+		while (true) {
+			auto il = processMoveRegInstr(insn);
+			INSN_ASSERT(il);
+			if (il->srcReg == A64::Register::FP) {
+				INSN_ASSERT(il->dstReg == A64::Register::TMP2);
+				break;
 			}
-			const auto call_target_reg = ARM64_REG_X9;
-
-			// save fp to stack
-			INSN_ASSERT(insn.id() == ARM64_INS_STR && insn.writeback());
-			INSN_ASSERT(insn.ops(0).reg == CSREG_DART_FP);
-			INSN_ASSERT(insn.ops(1).mem.base == CSREG_DART_SP && insn.ops(1).mem.disp == -8);
-			++insn;
-
-			INSN_ASSERT(insn.id() == ARM64_INS_MOV);
-			INSN_ASSERT(insn.ops(0).reg == CSREG_DART_FP);
-			INSN_ASSERT(insn.ops(1).reg == CSREG_DART_SP);
-			++insn;
-
-			INSN_ASSERT(insn.id() == ARM64_INS_AND);
-			INSN_ASSERT(insn.ops(0).reg == CSREG_DART_SP);
-			INSN_ASSERT(insn.ops(1).reg == CSREG_DART_SP);
-			INSN_ASSERT(insn.ops(2).imm == 0xfffffffffffffff0);
-			++insn;
-
-			INSN_ASSERT(insn.id() == ARM64_INS_MOV);
-			INSN_ASSERT(insn.ops(1).reg == ARM64_REG_SP);
-			const auto saved_csp_reg = insn.ops(0).reg;
-			++insn;
-
-			INSN_ASSERT(insn.id() == ARM64_INS_MOV);
-			INSN_ASSERT(insn.ops(0).reg == ARM64_REG_SP);
-			INSN_ASSERT(insn.ops(1).reg == CSREG_DART_SP);
-			++insn;
-
-			INSN_ASSERT(insn.id() == ARM64_INS_BLR);
-			INSN_ASSERT(insn.ops(0).reg == call_target_reg);
-			++insn;
-
-			INSN_ASSERT(insn.id() == ARM64_INS_MOV);
-			INSN_ASSERT(insn.ops(0).reg == ARM64_REG_SP);
-			INSN_ASSERT(insn.ops(1).reg == saved_csp_reg);
-			++insn;
-
-			INSN_ASSERT(insn.id() == ARM64_INS_MOV);
-			INSN_ASSERT(insn.ops(0).reg == CSREG_DART_SP);
-			INSN_ASSERT(insn.ops(1).reg == CSREG_DART_FP);
-			++insn;
-
-			INSN_ASSERT(insn.id() == ARM64_INS_LDR && insn.writeback());
-			INSN_ASSERT(insn.ops(0).reg == CSREG_DART_FP);
-			INSN_ASSERT(insn.ops(1).mem.base == CSREG_DART_SP && insn.ops(2).imm == 8);
-			++insn;
-
-			return std::make_unique<CallLeafRuntimeInstr>(insn.Wrap(marker.Take()), thr_offset, std::move(movILs));
+			else if (il->srcReg == tmp_target_reg) {
+				INSN_ASSERT(il->dstReg == A64::Register::R9);
+				//const auto call_target_reg = insn.ops(0).reg;
+			}
+			else {
+				// moving for setting up call paramaeters
+				movILs.push_back(std::move(il));
+			}
 		}
+		const auto call_target_reg = ARM64_REG_X9;
+
+		// save fp to stack
+		INSN_ASSERT(insn.id() == ARM64_INS_STR && insn.writeback());
+		INSN_ASSERT(insn.ops(0).reg == CSREG_DART_FP);
+		INSN_ASSERT(insn.ops(1).mem.base == CSREG_DART_SP && insn.ops(1).mem.disp == -8);
+		++insn;
+
+		INSN_ASSERT(insn.id() == ARM64_INS_MOV);
+		INSN_ASSERT(insn.ops(0).reg == CSREG_DART_FP);
+		INSN_ASSERT(insn.ops(1).reg == CSREG_DART_SP);
+		++insn;
+
+		INSN_ASSERT(insn.id() == ARM64_INS_AND);
+		INSN_ASSERT(insn.ops(0).reg == CSREG_DART_SP);
+		INSN_ASSERT(insn.ops(1).reg == CSREG_DART_SP);
+		INSN_ASSERT(insn.ops(2).imm == 0xfffffffffffffff0);
+		++insn;
+
+		INSN_ASSERT(insn.id() == ARM64_INS_MOV);
+		INSN_ASSERT(insn.ops(1).reg == ARM64_REG_SP);
+		const auto saved_csp_reg = insn.ops(0).reg;
+		++insn;
+
+		INSN_ASSERT(insn.id() == ARM64_INS_MOV);
+		INSN_ASSERT(insn.ops(0).reg == ARM64_REG_SP);
+		INSN_ASSERT(insn.ops(1).reg == CSREG_DART_SP);
+		++insn;
+
+		INSN_ASSERT(insn.id() == ARM64_INS_BLR);
+		INSN_ASSERT(insn.ops(0).reg == call_target_reg);
+		++insn;
+
+		INSN_ASSERT(insn.id() == ARM64_INS_MOV);
+		INSN_ASSERT(insn.ops(0).reg == ARM64_REG_SP);
+		INSN_ASSERT(insn.ops(1).reg == saved_csp_reg);
+		++insn;
+
+		INSN_ASSERT(insn.id() == ARM64_INS_MOV);
+		INSN_ASSERT(insn.ops(0).reg == CSREG_DART_SP);
+		INSN_ASSERT(insn.ops(1).reg == CSREG_DART_FP);
+		++insn;
+
+		INSN_ASSERT(insn.id() == ARM64_INS_LDR && insn.writeback());
+		INSN_ASSERT(insn.ops(0).reg == CSREG_DART_FP);
+		INSN_ASSERT(insn.ops(1).mem.base == CSREG_DART_SP && insn.ops(2).imm == 8);
+		++insn;
+
+		return std::make_unique<CallLeafRuntimeInstr>(insn.Wrap(marker.Take()), thr_offset, std::move(movILs));
 	}
 
 	return nullptr;
@@ -750,7 +760,7 @@ void FunctionAnalyzer::handlePrologue(AsmIterator& insn, uint64_t endPrologueAdd
 
 	// below check is very useful for checking analyzing prologue because it is correct in most case
 	if (hasPrologue && endPrologueAddr != 0 && endPrologueAddr != insn.address()) {
-		//std::cerr << std::format("endPrologueAddr != insn.address(), {:#x} != {:#x}\n", endPrologueAddr, insn.address());
+		//std::cerr << fmt::format("endPrologueAddr != insn.address(), {:#x} != {:#x}\n", endPrologueAddr, insn.address());
 	}
 
 	// Dart always check stack overflow if allocating stack instruction is emitted
@@ -1538,6 +1548,8 @@ std::unique_ptr<SetupParametersInstr> FunctionAnalyzer::processPrologueParameter
 	// this function is only called at prologue state
 	// some variable initialization might be inserted into between prologue instructions.
 	//   these ILs will be appended after Prologue IL even the assembly is before the prologue ends
+	// Note: with method extractors optmization (since Dart 3.4), arguments might pass via registers (R1, R2, R3).
+	//   now, only see in closure and async method.
 	auto optionalParamCntReg = ARM64_REG_INVALID;
 	auto firstParamReg = ARM64_REG_INVALID;
 	InsnMarker marker(insn);
@@ -1649,7 +1661,8 @@ std::unique_ptr<SetupParametersInstr> FunctionAnalyzer::processPrologueParameter
 				++insn;
 			}
 			else if (insn.id() == ARM64_INS_LDUR && insn.ops(1).mem.base == CSREG_ARGS_DESC) {
-				std::cerr << std::format("  !!! use ArgsDesc directory without moving !!! at {:#x}\n", insn.address());
+				//std::cout << fmt::format("  !!! use ArgsDesc directory without moving !!! at {:#x}\n", insn.address());
+				argsDescReg = CSREG_ARGS_DESC;
 			}
 			if (argsDescReg != ARM64_REG_INVALID)
 				fnInfo->State()->SetRegister(argsDescReg, fnInfo->Vars()->ValArgsDesc());
@@ -1783,14 +1796,23 @@ std::unique_ptr<SetupParametersInstr> FunctionAnalyzer::processPrologueParameter
 
 			handleDecompressPointer(insn, delayedTypeArgReg);
 
+#ifdef NO_METHOD_EXTRACTOR_STUB
+			// in this commit, THR::empty_type_arguments is introduced and used here
+			INSN_ASSERT(insn.id() == ARM64_INS_LDR);
+			INSN_ASSERT(insn.ops(1).mem.base == CSREG_DART_THR && insn.ops(1).mem.disp == dart::Thread::empty_type_arguments_offset());
+			A64::Register emptyTypeArgReg = insn.ops(0).reg;
+			++insn;
+#else
 			auto ppEmptyTypeArg = getObjectPoolInstruction(insn);
 			INSN_ASSERT(ppEmptyTypeArg.IsSet());
 			INSN_ASSERT(ppEmptyTypeArg.item.ValueTypeId() == dart::kTypeArgumentsCid);
+			A64::Register emptyTypeArgReg = ppEmptyTypeArg.dstReg;
+#endif
 
 			INSN_ASSERT(insn.id() == ARM64_INS_CMP);
 			INSN_ASSERT(ToCapstoneReg(insn.ops(0).reg) == delayedTypeArgReg);
-			INSN_ASSERT(A64::Register{ insn.ops(1).reg } == ppEmptyTypeArg.dstReg);
-			fnInfo->State()->ClearRegister(ppEmptyTypeArg.dstReg);
+			INSN_ASSERT(A64::Register{ insn.ops(1).reg } == emptyTypeArgReg);
+			fnInfo->State()->ClearRegister(emptyTypeArgReg);
 			++insn;
 
 			if (fnInfo->typeArgumentReg.IsSet() && insn.IsBranch(ARM64_CC_NE)) {
@@ -1854,10 +1876,35 @@ std::unique_ptr<SetupParametersInstr> FunctionAnalyzer::processPrologueParameter
 	}
 
 	if (insn.address() < endPrologueAddr) {
+		const auto addRegisterFunctionParameter = [&](A64::Register srcReg) {
+			// only R1, R2 and R3 for function arguments
+			INSN_ASSERT(srcReg == A64::Register::R1 || srcReg == A64::Register::R2 || srcReg == A64::Register::R3);
+			const auto argIdx = (int)srcReg - 1;
+			auto val = fnInfo->Vars()->ValParam(argIdx);
+			// set srcReg as function argument (previous should be nullptr)
+			fnInfo->State()->SetRegister(srcReg, val);
+			// assume register argument is used in order
+			INSN_ASSERT(fnInfo->params.NumParam() == argIdx);
+			auto paramInfo = FnParamInfo{ srcReg };
+			if (!dartFn->IsStatic() && argIdx == 0) {
+				// class method. first parameter is "this"
+				paramInfo.name = "this";
+				paramInfo.type = dartFn->Class().DeclarationType(); // TODO: class with type arguments (generic class)
+			}
+			fnInfo->params.add(std::move(paramInfo));
+			fnInfo->params.numFixedParam = argIdx + 1;
+			return val;
+		};
+
 		// moving registers
 		while (insn.id() == ARM64_INS_MOV && insn.ops(1).type == ARM64_OP_REG && insn.ops(1).reg != CSREG_DART_NULL) {
-			auto val = fnInfo->State()->MoveRegister(insn.ops(0).reg, insn.ops(1).reg);
-			INSN_ASSERT(val);
+			const A64::Register srcReg = insn.ops(1).reg;
+			const A64::Register dstReg = insn.ops(0).reg;
+			const auto val = fnInfo->State()->MoveRegister(dstReg, srcReg);
+			if (val == nullptr) {
+				auto val = addRegisterFunctionParameter(srcReg);
+				fnInfo->State()->SetRegister(dstReg, val);
+			}
 			++insn;
 		}
 		// before CheckStackOverflow, there might be loading paramters into registers and storing some register to local stack
@@ -1892,13 +1939,13 @@ std::unique_ptr<SetupParametersInstr> FunctionAnalyzer::processPrologueParameter
 			else {
 				auto val = fnInfo->State()->GetValue(srcReg);
 				if (val == nullptr) {
-					std::cerr << std::format("Cannot find define of srcReg\n");
-					auto ins = insn.Current() - 1;
-					std::cerr << std::format("  {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
+					//std::cout << fmt::format("Cannot find define of srcReg\n");
+					//auto ins = insn.Current() - 1;
+					//std::cout << fmt::format("  {:#x}: {} {}\n", ins->address, &ins->mnemonic[0], &ins->op_str[0]);
+					INSN_ASSERT(dartFn->IsClosure() || needSuspendState);
+					val = addRegisterFunctionParameter(srcReg);
 				}
-				else {
-					fnInfo->State()->SetLocal(storeRes.fpOffset, val);
-				}
+				fnInfo->State()->SetLocal(storeRes.fpOffset, val);
 			}
 		}
 	}

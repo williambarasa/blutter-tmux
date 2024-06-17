@@ -49,6 +49,7 @@ static Dart_Isolate load_isolate(const uint8_t* isolate_snapshot_data, const uin
 	if (pos == NULL) {
 		// dart 3 is always null safety, it's ok to consider null-safety to be present, blutter isn't able to find it
 		// in some of dev versions starting 3.5.0-xx-dev from snapshot data
+		// maybe because of -silent-null-safety haven't checked carefully
 	    std::cout << "Cannot find null-safety text. Setting null_safety to true." << std::endl;
 	    flags.null_safety = true;
 	} else {

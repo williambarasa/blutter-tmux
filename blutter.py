@@ -286,8 +286,6 @@ def main2(
         libapp_path, dart_info, outdir, rebuild_blutter, create_vs_sln, no_analysis
     )
     build_and_run(input)
-    if os.path.exists(temp_dir):
-        shutil.rmtree(temp_dir)
 
 
 def main(
@@ -297,7 +295,6 @@ def main(
     create_vs_sln: bool,
     no_analysis: bool,
 ):
-    temp_dir = ""
     if indir.endswith(".apk"):
         with tempfile.TemporaryDirectory() as tmp_dir:
             libapp_file, libflutter_file = extract_libs_from_apk(indir, tmp_dir)
@@ -319,7 +316,6 @@ def main(
             rebuild_blutter,
             create_vs_sln,
             no_analysis,
-            temp_dir,
         )
 
 

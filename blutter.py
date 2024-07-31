@@ -358,7 +358,7 @@ if __name__ == "__main__":
     # TODO: accept ipa
     parser.add_argument(
         "indir",
-        help="An apk or a directory directory that contains both libapp.so and libflutter.so",
+        help="An apk or a directory that contains both libapp.so and libflutter.so",
     )
     parser.add_argument("outdir", help="An output directory")
     parser.add_argument(

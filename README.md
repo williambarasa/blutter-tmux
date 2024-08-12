@@ -13,8 +13,6 @@ For high priority missing features, see [TODO](#todo)
 - Same as debian but needs ndk . if you dont want ndk then remove android library dependencies related files in dartsdk
 - I actually liked [fmt](https://github.com/fmtlib/fmt.git) library thats the main reason replaced standard format
 - Install `fmt`: `pkg install fmt`
-- In case you face errors related to `no member named 'format'`, you need to replace all occurance of std::format with fmt
-  ```find -type f -exec sed -i 's/std::format/fmt::format/g' {} +```
 - It should work for both dartsdk stable/beta builds didnt checked for dev builds
 - If any error related to capstone first check if is present in include dir  
     ```pkg-config --cflags capstone```
@@ -23,6 +21,13 @@ For high priority missing features, see [TODO](#todo)
 ```
 pip install requests pyelftools && pkg install -y git cmake ninja build-essential pkg-config libicu capstone fmt
 ```
+
+> [!NOTE]
+> In case you face errors related to `no member named 'format'`, you need to replace all occurance of __std::format__ with __fmt::format__ using below shell command:
+>  ```shell
+>  find -type f -exec sed -i 's/std::format/fmt::format/g' {} +
+>  ```
+
 
 https://github.com/dedshit/blutter-termux/assets/62318734/b7376844-96b0-4aa0-a395-9009d009132e
 
@@ -57,13 +62,35 @@ pip3 install pyelftools requests
 ```
 
 ## Usage
-Extract "lib" directory from apk file
-```
-python3 blutter.py path/to/app/lib/arm64-v8a out_dir
-```
-The blutter.py will automatically detect the Dart version from the flutter engine and call executable of blutter to get the information from libapp.so.
+Blutter can analyze Flutter applications in several ways.
 
-If the blutter executable for required Dart version does not exists, the script will automatically checkout Dart source code and compiling it.
+### APK File
+If you have an `.apk` file. Simply provide the path to the APK file and the output directory as arguments:
+```shell
+python3 blutter.py path/to/app.apk out_dir
+```
+
+### `.so` File(s)
+Blutter can also analyze `.so` files directly. This can be done in two ways:
+
+1. **Analyzing `.so` files extracted from an APK:**
+
+    If you have extracted the lib directory from an APK file, you can analyze it using Blutter. Provide the path to the lib directory and the output directory as arguments:
+    ```shell
+    python3 blutter.py path/to/app/lib/arm64-v8a out_dir
+    ```
+    > The `blutter.py` will automatically detect the Dart version from the Flutter engine and use the appropriate executable to extract information from `libapp.so`.
+
+2. **Analyzing `libapp.so` with a known Dart version:**
+
+    If you only have `libapp.so` and know its Dart version, you can specify it to Blutter. Provide the Dart version with `--dart-version` option, the path to `libapp.so`, and the output directory as arguments:
+    ```shell
+    python3 blutter.py --dart-version X.X.X_android_arm64 libapp.so out_dir
+    ```
+    > Replace `X.X.X` with your lib dart version such as "3.4.2_android_arm64". 
+
+
+If the Blutter executable for the required Dart version does not exist, the script will automatically checkout the Dart source code and compile it.
 
 ## Update
 You can use ```git pull``` to update and run blutter.py with ```--rebuild``` option to force rebuild the executable

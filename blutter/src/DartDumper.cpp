@@ -32,6 +32,16 @@ static std::string getFunctionName4Ida(const DartFunction& dartFn, const std::st
 		return "_anon_closure";
 	}
 
+	if (fnName.starts_with("#")) {
+		fnName.replace(0, 1, "@");
+	}
+
+	for (size_t pos = 0; ; pos += 1) {
+		pos = fnName.find("|_", pos);
+		if (pos == std::string::npos) break;
+		fnName.replace(pos, 2, "_");
+	}
+
 	auto periodPos = fnName.find('.');
 	std::string prefix;
 	if (dartFn.IsStatic() && dartFn.Kind() == DartFunction::NORMAL && periodPos != std::string::npos) {
@@ -42,6 +52,18 @@ static std::string getFunctionName4Ida(const DartFunction& dartFn, const std::st
 			std::replace(prefix.begin(), prefix.end(), '#', '@');
 		}
 		fnName = fnName.substr(periodPos + 1);
+	}
+
+	// fnNames: #0#4internal, #0#1internal gives invalid name in IDA due to '#'
+	// lib file: https://github.com/worawit/blutter/issues/93#issuecomment-2283490634
+	for (size_t pos = 0; pos < fnName.size(); ++pos) {
+		if (fnName[pos] == '@' && pos + 1 < fnName.size() && fnName[pos + 1] == '#') {
+			fnName.replace(pos, 2, "_");
+		} else if (fnName[pos] == '0' && pos + 1 < fnName.size() && fnName[pos + 1] == '#') {
+			fnName.replace(pos, 2, "0");
+		} else if (fnName[pos] == '#') {
+			fnName[pos] = '_';
+		}
 	}
 
 	if (OP_MAP.contains(fnName)) {
@@ -113,6 +135,7 @@ void DartDumper::Dump4Radare2(std::filesystem::path outDir)
 				std::replace(name.begin(), name.end(), '&', '_');
 				std::replace(name.begin(), name.end(), '-', '_');
 				std::replace(name.begin(), name.end(), '+', '_');
+				std::replace(name.begin(), name.end(), '?', '_');
 				if (show_library) {
 					of << fmt::format("CC Library({:#x}) = {} @ {}\n", lib->id, lib_prefix, ep);
 					of << fmt::format("f lib.{}={:#x} # {:#x}\n", lib_prefix, ep, lib->id);
@@ -123,7 +146,7 @@ void DartDumper::Dump4Radare2(std::filesystem::path outDir)
 					of << fmt::format("f class.{}.{}={:#x} # {:#x}\n", lib_prefix, cls_prefix, ep, cls->Id());
 					show_class = false;
 				}
-				of << fmt::format("f method.{}.{}.{}={:#x}\n", lib_prefix, cls_prefix, name.c_str(), ep);
+				of << fmt::format("f method.{}.{}.{}_{:x}={:#x}\n", lib_prefix, cls_prefix, name.c_str(), ep, ep);
 				if (dartFn->HasMorphicCode()) {
 					of << fmt::format("f method.{}.{}.{}.miss={:#x}\n", lib_prefix, cls_prefix, name.c_str(), 
 							dartFn->PayloadAddress());
@@ -147,7 +170,8 @@ void DartDumper::Dump4Radare2(std::filesystem::path outDir)
 		std::replace(name.begin(), name.end(), '&', '_');
 		std::replace(name.begin(), name.end(), '-', '_');
 		std::replace(name.begin(), name.end(), '+', '_');
-		of << fmt::format("f method.{}={:#x}\n", name.c_str(), ep);
+		std::replace(name.begin(), name.end(), '?', '_');
+		of << fmt::format("f method.{}_{:x}={:#x}\n", name.c_str(), ep, ep);
 	}
 
 }

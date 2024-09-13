@@ -139,6 +139,11 @@ def find_compat_macro(dart_version: str, no_analysis: bool):
     if no_analysis:
         macros.append("-DNO_CODE_ANALYSIS=1")
 
+    if dart_version >= "3.5.0":
+        # [vm] marking_stack_block_offset() changes in Dart Stable 3.5.0
+        # https://github.com/worawit/blutter/issues/96#issue-2470674670
+        macros.append("-DOLD_MARKING_STACK_BLOCK=1")
+
     return macros
 
 

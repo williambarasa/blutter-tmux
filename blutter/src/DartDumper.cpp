@@ -135,8 +135,8 @@ void DartDumper::Dump4Radare2(std::filesystem::path outDir)
 	
 	// app base & heap base address values changes on every run i.e, setting flag names for them is of no use
 
-	// of << std::format("f app.base = {:#x}\n", app.base());
-	// of << std::format("f app.heap_base = {:#x}\n", app.heap_base());
+	// of << fmt::format("f app.base = {:#x}\n", app.base());
+	// of << fmt::format("f app.heap_base = {:#x}\n", app.heap_base());
 
 	bool show_library = true;
 	bool show_class = true;
@@ -162,20 +162,20 @@ void DartDumper::Dump4Radare2(std::filesystem::path outDir)
 				std::replace(name.begin(), name.end(), '+', '_');
 				std::replace(name.begin(), name.end(), '?', '_');
 				if (show_library) {
-					of << std::format("CC Library({:#x}) = {} @ {}\n", lib->id, lib_prefix, ep);
-					of << std::format("f lib.{}={:#x} # {:#x}\n", lib_prefix, ep, lib->id);
+					of << fmt::format("CC Library({:#x}) = {} @ {}\n", lib->id, lib_prefix, ep);
+					of << fmt::format("f lib.{}={:#x} # {:#x}\n", lib_prefix, ep, lib->id);
 					show_library = false;
 				}
 				if (show_class) {
-					of << std::format("CC Class({:#x}) = {} @ {}\n", cls->Id(), cls_prefix, ep);
-					of << std::format("f class.{}.{}={:#x} # {:#x}\n", lib_prefix, cls_prefix, ep, cls->Id());
+					of << fmt::format("CC Class({:#x}) = {} @ {}\n", cls->Id(), cls_prefix, ep);
+					of << fmt::format("f class.{}.{}={:#x} # {:#x}\n", lib_prefix, cls_prefix, ep, cls->Id());
 					show_class = false;
 				}
-				of << std::format("f method.{}.{}.{}_{:x}={:#x}\n", lib_prefix, cls_prefix, name.c_str(), ep, ep);
+				of << fmt::format("f method.{}.{}.{}_{:x}={:#x}\n", lib_prefix, cls_prefix, name.c_str(), ep, ep);
 				if (dartFn->HasMorphicCode()) {
-					of << std::format("f method.{}.{}.{}.miss={:#x}\n", lib_prefix, cls_prefix, name.c_str(), 
+					of << fmt::format("f method.{}.{}.{}.miss={:#x}\n", lib_prefix, cls_prefix, name.c_str(), 
 							dartFn->PayloadAddress());
-					of << std::format("f method.{}.{}.{}.check={:#x}\n", lib_prefix, cls_prefix, name.c_str(), 
+					of << fmt::format("f method.{}.{}.{}.check={:#x}\n", lib_prefix, cls_prefix, name.c_str(), 
 							dartFn->MonomorphicAddress());
 				}
 			}
@@ -198,7 +198,7 @@ void DartDumper::Dump4Radare2(std::filesystem::path outDir)
 		std::replace(name.begin(), name.end(), '?', '_');
 		std::replace(name.begin(), name.end(), '(', '_'); // https://github.com/AbhiTheModder/blutter-termux/issues/6
 		std::replace(name.begin(), name.end(), ')', '_');
-		of << std::format("f method.stub.{}_{:x}={:#x}\n", name.c_str(), ep, ep);
+		of << fmt::format("f method.stub.{}_{:x}={:#x}\n", name.c_str(), ep, ep);
 	}
 
 	of << "f pptr=x27\n"; // TODO: hardcoded value

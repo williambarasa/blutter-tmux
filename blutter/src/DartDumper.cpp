@@ -25,6 +25,28 @@ static std::unordered_map<std::string, std::string> OP_MAP {
 	{ "&", "LAnd" }, { "|", "LOr" }, { "^", "xor" }, { "~", "not" }, {">>", "shar"}, {"<<", "shal"}, {">>", "shr"}
 };
 
+static bool is_valid_char(const char ch) {
+	if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || isdigit(ch)) {
+		return true;
+	}
+	switch (ch) {
+	case '.':
+	case ':':
+	case '_':
+		return true;
+	default:
+		return false;
+	}
+}
+
+static void filterString(std::string &str) {
+	for (char& ch : str) {
+		if (!is_valid_char(ch)) {
+			ch = '_';
+		}
+	}
+}
+
 static std::string getFunctionName4Ida(const DartFunction& dartFn, const std::string& cls_prefix)
 {
 	auto fnName = dartFn.Name();
@@ -104,14 +126,17 @@ static std::string getFunctionName4Ida(const DartFunction& dartFn, const std::st
 	return prefix + fnName;
 }
 
+
 void DartDumper::Dump4Radare2(std::filesystem::path outDir)
 {
 	std::filesystem::create_directory(outDir);
 	std::ofstream of((outDir / "addNames.r2").string());
 	of << "# create flags for libraries, classes and methods\n";
+	
+	// app base & heap base address values changes on every run i.e, setting flag names for them is of no use
 
-	of << fmt::format("f app.base = {:#x}\n", app.base());
-	of << fmt::format("f app.heap_base = {:#x}\n", app.heap_base());
+	// of << std::format("f app.base = {:#x}\n", app.base());
+	// of << std::format("f app.heap_base = {:#x}\n", app.heap_base());
 
 	bool show_library = true;
 	bool show_class = true;
@@ -137,20 +162,20 @@ void DartDumper::Dump4Radare2(std::filesystem::path outDir)
 				std::replace(name.begin(), name.end(), '+', '_');
 				std::replace(name.begin(), name.end(), '?', '_');
 				if (show_library) {
-					of << fmt::format("CC Library({:#x}) = {} @ {}\n", lib->id, lib_prefix, ep);
-					of << fmt::format("f lib.{}={:#x} # {:#x}\n", lib_prefix, ep, lib->id);
+					of << std::format("CC Library({:#x}) = {} @ {}\n", lib->id, lib_prefix, ep);
+					of << std::format("f lib.{}={:#x} # {:#x}\n", lib_prefix, ep, lib->id);
 					show_library = false;
 				}
 				if (show_class) {
-					of << fmt::format("CC Class({:#x}) = {} @ {}\n", cls->Id(), cls_prefix, ep);
-					of << fmt::format("f class.{}.{}={:#x} # {:#x}\n", lib_prefix, cls_prefix, ep, cls->Id());
+					of << std::format("CC Class({:#x}) = {} @ {}\n", cls->Id(), cls_prefix, ep);
+					of << std::format("f class.{}.{}={:#x} # {:#x}\n", lib_prefix, cls_prefix, ep, cls->Id());
 					show_class = false;
 				}
-				of << fmt::format("f method.{}.{}.{}_{:x}={:#x}\n", lib_prefix, cls_prefix, name.c_str(), ep, ep);
+				of << std::format("f method.{}.{}.{}_{:x}={:#x}\n", lib_prefix, cls_prefix, name.c_str(), ep, ep);
 				if (dartFn->HasMorphicCode()) {
-					of << fmt::format("f method.{}.{}.{}.miss={:#x}\n", lib_prefix, cls_prefix, name.c_str(), 
+					of << std::format("f method.{}.{}.{}.miss={:#x}\n", lib_prefix, cls_prefix, name.c_str(), 
 							dartFn->PayloadAddress());
-					of << fmt::format("f method.{}.{}.{}.check={:#x}\n", lib_prefix, cls_prefix, name.c_str(), 
+					of << std::format("f method.{}.{}.{}.check={:#x}\n", lib_prefix, cls_prefix, name.c_str(), 
 							dartFn->MonomorphicAddress());
 				}
 			}
@@ -161,7 +186,7 @@ void DartDumper::Dump4Radare2(std::filesystem::path outDir)
 	for (auto& item : app.stubs) {
 		auto stub = item.second;
 		const auto ep = stub->Address();
-		auto name = stub->FullName();
+		std::string name = stub->FullName();
 		std::replace(name.begin(), name.end(), '<', '_');
 		std::replace(name.begin(), name.end(), '>', '_');
 		std::replace(name.begin(), name.end(), ',', '_');
@@ -171,9 +196,21 @@ void DartDumper::Dump4Radare2(std::filesystem::path outDir)
 		std::replace(name.begin(), name.end(), '-', '_');
 		std::replace(name.begin(), name.end(), '+', '_');
 		std::replace(name.begin(), name.end(), '?', '_');
-		of << fmt::format("f method.{}_{:x}={:#x}\n", name.c_str(), ep, ep);
+		std::replace(name.begin(), name.end(), '(', '_'); // https://github.com/AbhiTheModder/blutter-termux/issues/6
+		std::replace(name.begin(), name.end(), ')', '_');
+		of << std::format("f method.stub.{}_{:x}={:#x}\n", name.c_str(), ep, ep);
 	}
 
+	of << "f pptr=x27\n"; // TODO: hardcoded value
+	auto comments = DumpStructHeaderFile((outDir / "r2_dart_struct.h").string());
+	for (const auto& [offset, comment] : comments) {
+		if (comment.find("String:") != -1) {
+			std::string flagFromComment = comment;
+			filterString(flagFromComment);
+			of << "f pp." << flagFromComment << "=pptr+" << offset << "\n";
+			of << "'@0x0+" << offset << "'CC " << comment << "\n";
+		}
+	}
 }
 
 void DartDumper::Dump4Ida(std::filesystem::path outDir)

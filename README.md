@@ -41,13 +41,13 @@ I recommend using Linux OS (only tested on Deiban sid/trixie) because it is easy
 - Install build tools and depenencies
 ```
 apt install python3-pyelftools python3-requests git cmake ninja-build \
-    build-essential pkg-config libicu-dev libcapstone-dev
+    build-essential pkg-config libicu-dev libcapstone-dev libfmt-dev
 ```
 
 ### Windows
 - Install git and python 3
 - Install latest Visual Studio with "Desktop development with C++" and "C++ CMake tools"
-- Install required libraries (libcapstone and libicu4c)
+- Install required libraries (libcapstone, libicu4c and fmt)
 ```
 python scripts\init_env_win.py
 ```
@@ -57,7 +57,7 @@ python scripts\init_env_win.py
 - Install XCode
 - Install clang 16 and required tools
 ```
-brew install llvm@16 cmake ninja pkg-config icu4c capstone
+brew install llvm@16 cmake ninja pkg-config icu4c capstone fmt
 pip3 install pyelftools requests
 ```
 

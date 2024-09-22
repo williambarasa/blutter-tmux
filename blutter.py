@@ -386,10 +386,16 @@ if __name__ == "__main__":
         "--dart-version",
         help='Run without libflutter (indir become libapp.so) by specify dart version such as "3.4.2_android_arm64"',
     )
+    parser.add_argument(
+        "--nu",
+        action="store_false",
+        default=True,
+        help="Don't check for updates",
+    )
     args = parser.parse_args()
 
-    # Check for updates and pull them if necessary
-    check_for_updates_and_pull()
+    if args.nu:
+        check_for_updates_and_pull()
 
     if args.dart_version is None:
         main(args.indir, args.outdir, args.rebuild, args.vs_sln, args.no_analysis)

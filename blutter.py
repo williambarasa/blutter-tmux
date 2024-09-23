@@ -408,7 +408,7 @@ if __name__ == "__main__":
         "--ida-fcn",
         action="store_true",
         default=False,
-        help="Generate IDA function names script, Doesn't Generates Thread and Object Pool structs",
+        help="Generate IDA function names script, Doesn't Generates Thread and Object Pool structs comments",
     )
     args = parser.parse_args()
 

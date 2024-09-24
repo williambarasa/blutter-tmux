@@ -65,7 +65,7 @@ class DartLibInfo:
         
         if os.path.exists(os.path.join(SCRIPT_DIR, "bin")):
             file_name_version = []
-            suffixes = ["", "_no-analysis", "_ida-fcn", "_no-analysis_ida-fcn"]
+            suffixes = ["", "_no-analysis", "_ida-fcn", "_no-analysis_ida-fcn", "_no-compressed-ptrs", "_no-compressed-ptrs_no-analysis", "_no-compressed-ptrs_no-analysis_ida-fcn", "_no-compressed-ptrs_ida-fcn"]
             for file in os.listdir(os.path.join(SCRIPT_DIR, "bin")):
                 for suffix in suffixes:
                     if file.startswith("blutter_dartvm") and file.endswith(f"{os_name}_{arch}{suffix}"):

@@ -148,9 +148,12 @@ def find_compat_macro(dart_version: str, no_analysis: bool, ida_fcn: bool):
     
     d_v = float('.'.join(dart_version.split('.')[:2]))
     if d_v >= float(3.5) :
-        # [vm] marking_stack_block_offset() changes in Dart Stable 3.5.0
-        # https://github.com/worawit/blutter/issues/96#issue-2470674670
-        macros.append("-DOLD_MARKING_STACK_BLOCK=1")
+        with open(os.path.join(vm_path, "compiler", "runtime_api.h"), "rb") as f:
+            mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+            if not mm.find(b" old_marking_stack_block_offset") == -1:
+                # [vm] marking_stack_block_offset() changes since Dart Stable 3.5.0
+                # https://github.com/worawit/blutter/issues/96#issue-2470674670
+                macros.append("-DOLD_MARKING_STACK_BLOCK=1")
     return macros
 
 

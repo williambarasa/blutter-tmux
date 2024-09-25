@@ -31,12 +31,14 @@ class BlutterInput:
         rebuild_blutter: bool,
         create_vs_sln: bool,
         no_analysis: bool,
+        ida_fcn: bool,
     ):
         self.libapp_path = libapp_path
         self.dart_info = dart_info
         self.outdir = outdir
         self.rebuild_blutter = rebuild_blutter
         self.create_vs_sln = create_vs_sln
+        self.ida_fcn = ida_fcn
 
         vers = dart_info.version.split(".", 2)
         if int(vers[0]) == 2 and int(vers[1]) < 15:
@@ -51,6 +53,8 @@ class BlutterInput:
             self.name_suffix += "_no-compressed-ptrs"
         if no_analysis:
             self.name_suffix += "_no-analysis"
+        if ida_fcn:
+            self.name_suffix += "_ida-fcn"
         # derive blutter executable filename
         self.blutter_name = f"blutter_{dart_info.lib_name}{self.name_suffix}"
         self.blutter_file = os.path.join(BIN_DIR, self.blutter_name) + (
@@ -90,7 +94,7 @@ def extract_libs_from_apk(apk_file: str, out_dir: str):
         return app_file, flutter_file
 
 
-def find_compat_macro(dart_version: str, no_analysis: bool):
+def find_compat_macro(dart_version: str, no_analysis: bool, ida_fcn: bool):
     macros = []
     include_path = os.path.join(PKG_INC_DIR, f"dartvm{dart_version}")
     vm_path = os.path.join(include_path, "vm")
@@ -139,11 +143,17 @@ def find_compat_macro(dart_version: str, no_analysis: bool):
     if no_analysis:
         macros.append("-DNO_CODE_ANALYSIS=1")
 
-    if dart_version >= "3.5.0":
-        # [vm] marking_stack_block_offset() changes in Dart Stable 3.5.0
-        # https://github.com/worawit/blutter/issues/96#issue-2470674670
-        macros.append("-DOLD_MARKING_STACK_BLOCK=1")
-
+    if ida_fcn:
+        macros.append("-DIDA_FCN=1")
+    
+    d_v = float('.'.join(dart_version.split('.')[:2]))
+    if d_v >= float(3.5) :
+        with open(os.path.join(vm_path, "compiler", "runtime_api.h"), "rb") as f:
+            mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+            if not mm.find(b" old_marking_stack_block_offset") == -1:
+                # [vm] marking_stack_block_offset() changes since Dart Stable 3.5.0
+                # https://github.com/worawit/blutter/issues/96#issue-2470674670
+                macros.append("-DOLD_MARKING_STACK_BLOCK=1")
     return macros
 
 
@@ -151,7 +161,7 @@ def cmake_blutter(input: BlutterInput):
     blutter_dir = os.path.join(SCRIPT_DIR, "blutter")
     builddir = os.path.join(BUILD_DIR, input.blutter_name)
 
-    macros = find_compat_macro(input.dart_info.version, input.no_analysis)
+    macros = find_compat_macro(input.dart_info.version, input.no_analysis, input.ida_fcn)
 
     my_env = None
     if platform.system() == "Darwin":
@@ -222,7 +232,7 @@ def build_and_run(input: BlutterInput):
 
     # creating Visual Studio solution overrides building
     if input.create_vs_sln:
-        macros = find_compat_macro(dart_version, no_analysis)
+        macros = find_compat_macro(input.dart_info.version, input.no_analysis, input.ida_fcn)
         blutter_dir = os.path.join(SCRIPT_DIR, "blutter")
         dbg_output_path = os.path.abspath(os.path.join(input.outdir, "out"))
         dbg_cmd_args = f"-i {input.libapp_path} -o {dbg_output_path}"
@@ -269,11 +279,12 @@ def main_no_flutter(
     rebuild_blutter: bool,
     create_vs_sln: bool,
     no_analysis: bool,
+    ida_fcn: bool,
 ):
     version, os_name, arch = dart_version.split("_")
     dart_info = DartLibInfo(version, os_name, arch)
     input = BlutterInput(
-        libapp_path, dart_info, outdir, rebuild_blutter, create_vs_sln, no_analysis
+        libapp_path, dart_info, outdir, rebuild_blutter, create_vs_sln, no_analysis, ida_fcn
     )
     build_and_run(input)
 
@@ -285,10 +296,11 @@ def main2(
     rebuild_blutter: bool,
     create_vs_sln: bool,
     no_analysis: bool,
+    ida_fcn: bool,
 ):
     dart_info = get_dart_lib_info(libapp_path, libflutter_path)
     input = BlutterInput(
-        libapp_path, dart_info, outdir, rebuild_blutter, create_vs_sln, no_analysis
+        libapp_path, dart_info, outdir, rebuild_blutter, create_vs_sln, no_analysis, ida_fcn
     )
     build_and_run(input)
 
@@ -299,6 +311,7 @@ def main(
     rebuild_blutter: bool,
     create_vs_sln: bool,
     no_analysis: bool,
+    ida_fcn: bool,
 ):
     if indir.endswith(".apk"):
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -310,6 +323,7 @@ def main(
                 rebuild_blutter,
                 create_vs_sln,
                 no_analysis,
+                ida_fcn,
             )
     else:
         libapp_file, libflutter_file = find_lib_files(indir)
@@ -321,6 +335,7 @@ def main(
             rebuild_blutter,
             create_vs_sln,
             no_analysis,
+            ida_fcn,
         )
 
 
@@ -386,13 +401,25 @@ if __name__ == "__main__":
         "--dart-version",
         help='Run without libflutter (indir become libapp.so) by specify dart version such as "3.4.2_android_arm64"',
     )
+    parser.add_argument(
+        "--nu",
+        action="store_false",
+        default=True,
+        help="Don't check for updates",
+    )
+    parser.add_argument(
+        "--ida-fcn",
+        action="store_true",
+        default=False,
+        help="Generate IDA function names script, Doesn't Generates Thread and Object Pool structs comments",
+    )
     args = parser.parse_args()
 
-    # Check for updates and pull them if necessary
-    check_for_updates_and_pull()
+    if args.nu:
+        check_for_updates_and_pull()
 
     if args.dart_version is None:
-        main(args.indir, args.outdir, args.rebuild, args.vs_sln, args.no_analysis)
+        main(args.indir, args.outdir, args.rebuild, args.vs_sln, args.no_analysis, args.ida_fcn)
     else:
         main_no_flutter(
             args.indir,
@@ -401,4 +428,5 @@ if __name__ == "__main__":
             args.rebuild,
             args.vs_sln,
             args.no_analysis,
+            args.ida_fcn,
         )

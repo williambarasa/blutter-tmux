@@ -132,51 +132,45 @@ void DartDumper::Dump4Radare2(std::filesystem::path outDir)
 	std::filesystem::create_directory(outDir);
 	std::ofstream of((outDir / "addNames.r2").string());
 	of << "# create flags for libraries, classes and methods\n";
-	
-	// app base & heap base address values changes on every run i.e, setting flag names for them is of no use
 
-	// of << fmt::format("f app.base = {:#x}\n", app.base());
-	// of << fmt::format("f app.heap_base = {:#x}\n", app.heap_base());
+	of << "e emu.str=true\n";
+	// app base & heap base address values changes on every run i.e, setting flag names for them is of no use
+	// but since right now r2 bases it to address 0 let's leave it as it is
+	// https://github.com/worawit/blutter/pull/104#discussion_r1769637361
+	of << fmt::format("f app.base = {:#x}\n", app.base());
+	of << fmt::format("f app.heap_base = {:#x}\n", app.heap_base());
 
 	bool show_library = true;
 	bool show_class = true;
 	for (auto lib : app.libs) {
 		std::string lib_prefix = lib->GetName();
-
-		std::replace(lib_prefix.begin(), lib_prefix.end(), '$', '_');
-		std::replace(lib_prefix.begin(), lib_prefix.end(), '&', '_');
-		std::replace(lib_prefix.begin(), lib_prefix.end(), '-', '_');
-		std::replace(lib_prefix.begin(), lib_prefix.end(), '+', '_');
+		filterString(lib_prefix);
 		for (auto cls : lib->classes) {
 			std::string cls_prefix = cls->Name();
-			std::replace(cls_prefix.begin(), cls_prefix.end(), '$', '_');
-			std::replace(cls_prefix.begin(), cls_prefix.end(), '&', '_');
-			std::replace(cls_prefix.begin(), cls_prefix.end(), '-', '_');
-			std::replace(cls_prefix.begin(), cls_prefix.end(), '+', '_');
+			filterString(cls_prefix);
 			for (auto dartFn : cls->Functions()) {
 				const auto ep = dartFn->Address();
-				auto name = getFunctionName4Ida(*dartFn, cls_prefix);
-				std::replace(name.begin(), name.end(), '$', '_');
-				std::replace(name.begin(), name.end(), '&', '_');
-				std::replace(name.begin(), name.end(), '-', '_');
-				std::replace(name.begin(), name.end(), '+', '_');
-				std::replace(name.begin(), name.end(), '?', '_');
+				std::string name = getFunctionName4Ida(*dartFn, cls_prefix);
+				filterString(name);
 				if (show_library) {
-					of << fmt::format("CC Library({:#x}) = {} @ {}\n", lib->id, lib_prefix, ep);
-					of << fmt::format("f lib.{}={:#x} # {:#x}\n", lib_prefix, ep, lib->id);
+					of << fmt::format("'@{:#x}'CC Library({:#x}) = {}\n", ep, lib->id, lib->GetName());
+					of << fmt::format("'@{:#x}'f lib.{}\n", ep, lib_prefix);
 					show_library = false;
 				}
 				if (show_class) {
-					of << fmt::format("CC Class({:#x}) = {} @ {}\n", cls->Id(), cls_prefix, ep);
-					of << fmt::format("f class.{}.{}={:#x} # {:#x}\n", lib_prefix, cls_prefix, ep, cls->Id());
+					of << fmt::format("'@{:#x}'CC Class({:#x}) = {}\n", ep, cls->Id(), cls->Name());
+					of << fmt::format("'@{:#x}'f class.{}.{}\n", ep, lib_prefix, cls_prefix);
 					show_class = false;
 				}
-				of << fmt::format("f method.{}.{}.{}_{:x}={:#x}\n", lib_prefix, cls_prefix, name.c_str(), ep, ep);
+				of << fmt::format("'@{:#x}'f method.{}.{}.{}\n", ep, lib_prefix, cls_prefix, name);
+				of << fmt::format("'@{:#x}'ic+{}.{}\n", ep, cls_prefix, name);
 				if (dartFn->HasMorphicCode()) {
-					of << fmt::format("f method.{}.{}.{}.miss={:#x}\n", lib_prefix, cls_prefix, name.c_str(), 
-							dartFn->PayloadAddress());
-					of << fmt::format("f method.{}.{}.{}.check={:#x}\n", lib_prefix, cls_prefix, name.c_str(), 
-							dartFn->MonomorphicAddress());
+					of << fmt::format("'@{:#x}'f method.{}.{}.{}.miss\n",
+							dartFn->PayloadAddress(),
+							lib_prefix, cls_prefix, name);
+					of << fmt::format("'@{:#x}'f method.{}.{}.{}.check\n",
+							dartFn->MonomorphicAddress(),
+							lib_prefix, cls_prefix, name);
 				}
 			}
 			show_class = true;
@@ -187,28 +181,19 @@ void DartDumper::Dump4Radare2(std::filesystem::path outDir)
 		auto stub = item.second;
 		const auto ep = stub->Address();
 		std::string name = stub->FullName();
-		std::replace(name.begin(), name.end(), '<', '_');
-		std::replace(name.begin(), name.end(), '>', '_');
-		std::replace(name.begin(), name.end(), ',', '_');
-		std::replace(name.begin(), name.end(), ' ', '_');
-		std::replace(name.begin(), name.end(), '$', '_');
-		std::replace(name.begin(), name.end(), '&', '_');
-		std::replace(name.begin(), name.end(), '-', '_');
-		std::replace(name.begin(), name.end(), '+', '_');
-		std::replace(name.begin(), name.end(), '?', '_');
-		std::replace(name.begin(), name.end(), '(', '_'); // https://github.com/AbhiTheModder/blutter-termux/issues/6
-		std::replace(name.begin(), name.end(), ')', '_');
-		of << fmt::format("f method.stub.{}_{:x}={:#x}\n", name.c_str(), ep, ep);
+		std::string flagName = name;
+		filterString(flagName);
+		of << fmt::format("'@{:#x}'f method.stub.{}\n", ep, flagName);
 	}
-
-	of << "f pptr=x27\n"; // TODO: hardcoded value
+	of << "dr x27=`e anal.gp`\n";
+	of << "'f PP=x27\n";
 	auto comments = DumpStructHeaderFile((outDir / "r2_dart_struct.h").string());
 	for (const auto& [offset, comment] : comments) {
 		if (comment.find("String:") != -1) {
 			std::string flagFromComment = comment;
 			filterString(flagFromComment);
-			of << "f pp." << flagFromComment << "=pptr+" << offset << "\n";
-			of << "'@0x0+" << offset << "'CC " << comment << "\n";
+			of << "f pp." << flagFromComment << "=PP+" << offset << "\n";
+			of << "'@PP+" << offset << "'CC " << comment << "\n";
 		}
 	}
 }
@@ -219,6 +204,7 @@ void DartDumper::Dump4Ida(std::filesystem::path outDir)
 	std::ofstream of((outDir / "addNames.py").string());
 	of << "import ida_funcs\n";
 	of << "import idaapi\n\n";
+	of << "print(\"[+] Adding Function names...\")\n\n";
 
 	for (auto lib : app.libs) {
 		std::string lib_prefix = lib->GetName();
@@ -250,8 +236,9 @@ void DartDumper::Dump4Ida(std::filesystem::path outDir)
 			continue;
 		of << fmt::format("ida_funcs.add_func({:#x}, {:#x})\n", ep, ep + stub->Size());
 	}
+	of << "print(\"[+] Done!\")\n";
 
-
+#ifndef IDA_FCN
 	// Note: create struct with a lot of member by ida script is very slow
 	//   use header file then adding comment is much faster
 	auto comments = DumpStructHeaderFile((outDir / "ida_dart_struct.h").string());
@@ -271,13 +258,27 @@ def create_Dart_structs():
 	for (const auto& [offset, comment] : comments) {
 		of << "\tida_struct.set_member_cmt(ida_struct.get_member(struc, " << offset << "), '''" << comment << "''', True)\n";
 	}
+#else
+	auto comments = DumpStructHeaderFile((outDir / "ida_dart_struct.h").string());
+	of << R"CBLOCK(
+import os
+def create_Dart_structs():
+	sid1 = idc.get_struc_id("DartThread")
+	if sid1 != idc.BADADDR:
+		return sid1, idc.get_struc_id("DartObjectPool")
+	hdr_file = os.path.join(os.path.dirname(__file__), 'ida_dart_struct.h')
+	idaapi.idc_parse_types(hdr_file, idc.PT_FILE)
+	sid1 = idc.import_type(-1, "DartThread")
+	sid2 = idc.import_type(-1, "DartObjectPool")
+)CBLOCK";
+#endif
 	of << "\treturn sid1, sid2\n";
 	of << "thrs, pps = create_Dart_structs()\n";
 
-	of << "print('Applying Thread and Object Pool struct')\n";
+	of << "print('[+] Applying Thread and Object Pool struct')\n";
 	applyStruct4Ida(of);
 
-	of << "print('Script finished!')\n";
+	of << "print('[+] Script finished!')\n";
 }
 
 std::vector<std::pair<intptr_t, std::string>> DartDumper::DumpStructHeaderFile(std::string outFile)

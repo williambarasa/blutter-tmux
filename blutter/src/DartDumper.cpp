@@ -774,15 +774,15 @@ std::string DartDumper::ObjectToString(dart::Object& obj, bool simpleForm, bool 
 	}
 	case dart::kInt32x4Cid: {
 		const auto& simd = dart::Int32x4::Cast(obj);
-		return std::format("Int32x4: ({}, {}, {}, {})", simd.x(), simd.y(), simd.z(), simd.w());
+		return fmt::format("Int32x4: ({}, {}, {}, {})", simd.x(), simd.y(), simd.z(), simd.w());
 	}
 	case dart::kFloat32x4Cid: {
 		const auto& simd = dart::Float32x4::Cast(obj);
-		return std::format("Float32x4: ({}, {}, {}, {})", simd.x(), simd.y(), simd.z(), simd.w());
+		return fmt::format("Float32x4: ({}, {}, {}, {})", simd.x(), simd.y(), simd.z(), simd.w());
 	}
 	case dart::kFloat64x2Cid: {
 		const auto& simd = dart::Float64x2::Cast(obj);
-		return std::format("Float64x2: ({}, {})", simd.x(), simd.y());
+		return fmt::format("Float64x2: ({}, {})", simd.x(), simd.y());
 	}
 	case dart::kInstanceCid:
 		return fmt::format("Obj!Object@{:x}", (uint32_t)(intptr_t)obj.ptr());

@@ -154,6 +154,10 @@ def find_compat_macro(dart_version: str, no_analysis: bool, ida_fcn: bool):
                 # [vm] marking_stack_block_offset() changes since Dart Stable 3.5.0
                 # https://github.com/worawit/blutter/issues/96#issue-2470674670
                 macros.append("-DOLD_MARKING_STACK_BLOCK=1")
+    
+    if mm.find(b"parameterized_function_type") == -1:
+        macros.append("-DNO_PARAMETERIZED_FUNCTION_TYPE=1")
+
     return macros
 
 

@@ -147,7 +147,7 @@ static VarValue* getPoolObject(DartApp& app, intptr_t offset, A64::Register dstR
 		case dart::kInt32x4Cid:
 		case dart::kFloat32x4Cid:
 		case dart::kFloat64x2Cid:
-			return new VarExpression(std::format("{}", obj.ToCString()), (int32_t)obj.GetClassId()); 
+			return new VarExpression(fmt::format("{}", obj.ToCString()), (int32_t)obj.GetClassId()); 
 		case dart::kLibraryPrefixCid:
 			// TODO: handle LibraryPrefix object
 		case dart::kInstanceCid:

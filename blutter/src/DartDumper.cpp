@@ -593,8 +593,8 @@ std::string DartDumper::ObjectToString(dart::Object& obj, bool simpleForm, bool 
 		return fmt::format("Smi: {:#x}", dart::Smi::Cast(obj).Value());
 	case dart::kMintCid:
 		if (simpleForm || depth > 0)
-			return fmt::format("{:#x}", dart::Mint::Cast(obj).value());
-		return fmt::format("Mint: {:#x}", dart::Mint::Cast(obj).value());
+			return fmt::format("{:#x}", MintValue( dart::Mint::Cast(obj)));
+		return fmt::format("Mint: {:#x}", MintValue(dart::Mint::Cast(obj)));
 	case dart::kDoubleCid:
 		if (simpleForm || depth > 0)
 			return fmt::format("{}", dart::Double::Cast(obj).value());
@@ -679,7 +679,7 @@ std::string DartDumper::ObjectToString(dart::Object& obj, bool simpleForm, bool 
 	case dart::kRecordCid: {
 		const auto& record = dart::Record::Cast(obj);
 		std::ostringstream ss;
-		const auto type = app.typeDb->FindOrAdd(record.GetRecordType());
+		const auto type = app.typeDb->FindOrAdd(DartGetRecordType(record));
 		ss << "Record" << type->ToString() << " = (";
 		auto& field = dart::Object::Handle();
 		const auto num_fields = record.num_fields();

@@ -49,8 +49,8 @@ class DartLibInfo:
         version: str,
         os_name: str,
         arch: str,
-        has_compressed_ptrs: bool = None,
-        snapshot_hash: str = None,
+        has_compressed_ptrs: bool | None = None,
+        snapshot_hash: str | None = None,
     ):
         self.os_name = os_name
         self.arch = arch

@@ -1,144 +1,267 @@
-import io
 import os
-import re
-import requests
+import shutil
+import stat
+import subprocess
 import sys
-import zipfile
-import zlib
-from struct import unpack
+import logging
+import subprocess
 
-from elftools.elf.elffile import ELFFile
-from elftools.elf.enums import ENUM_E_MACHINE 
-from elftools.elf.sections import SymbolTableSection
+# assume git and cmake (64 bits) command is in PATH
+GIT_CMD = "git"
+CMAKE_CMD = "cmake"
+NINJA_CMD = "ninja"
 
-# TODO: support both ELF and Mach-O file
-def extract_snapshot_hash_flags(libapp_file):
-    with open(libapp_file, 'rb') as f:
-        elf = ELFFile(f)
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+CMAKE_TEMPLATE_FILE = os.path.join(SCRIPT_DIR, "scripts", "CMakeLists.txt")
+CREATE_SRCLIST_FILE = os.path.join(SCRIPT_DIR, "scripts", "dartvm_create_srclist.py")
+MAKE_VERSION_FILE = os.path.join(SCRIPT_DIR, "scripts", "dartvm_make_version.py")
 
-        dynsym = elf.get_section_by_name('.dynsym')
-        if dynsym is None:
-            raise ValueError("Missing '.dynsym' section.")
+SDK_DIR = os.path.join(SCRIPT_DIR, "dartsdk")
+BUILD_DIR = os.path.join(SCRIPT_DIR, "build")
 
-        symbols = dynsym.get_symbol_by_name('_kDartVmSnapshotData')
-        if not symbols:
-            raise ValueError("Symbol '_kDartVmSnapshotData' not found.")
+# DART_GIT_URL = 'https://dart.googlesource.com/sdk.git'
+DART_GIT_URL = "https://github.com/dart-lang/sdk.git"
 
-        sym = symbols[0]
-        if sym['st_size'] <= 128:
-            raise ValueError("Snapshot data symbol too small to be valid.")
+imp_replace_snippet = """import importlib.util
+import importlib.machinery
 
-        f.seek(sym['st_value'] + 20)
-        snapshot_hash = f.read(32).decode(errors='ignore')
+def load_source(modname, filename):
+    loader = importlib.machinery.SourceFileLoader(modname, filename)
+    spec = importlib.util.spec_from_file_location(modname, filename, loader=loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+"""
 
-        raw_flags = f.read(256)
-        null_index = raw_flags.find(b'\0')
-        flags = raw_flags[:null_index].decode().strip().split() if null_index != -1 else 
 
-    return snapshot_hash, flags
+dart_versions = {
+    "3.4": ["3.4.0", "3.4.1", "3.4.2", "3.4.3", "3.4.4"],
+    "3.3": ["3.3.0", "3.3.1", "3.3.2", "3.3.3", "3.3.4"],
+    "3.5": ["3.5.0", "3.5.1", "3.5.2", "3.5.3"],
+    "3.0_aa": ["3.0.0", "3.0.1", "3.0.2"],
+    "3.0_90": ["3.0.3", "3.0.4", "3.0.5", "3.0.6", "3.0.7"],
+    "3.1": ["3.1.0", "3.1.1", "3.1.2", "3.1.3", "3.1.4", "3.1.5"],
+    "3.2": ["3.2.0", "3.2.1", "3.2.2", "3.2.3", "3.2.4", "3.2.5", "3.2.6"],
+}
 
-def extract_libflutter_info(libflutter_file):
-    with open(libflutter_file, 'rb') as f:
-        elf = ELFFile(f)
-        if elf.header.e_machine == 'EM_AARCH64': # 183
-            arch = 'arm64'
-        elif elf.header.e_machine == 'EM_IA_64': # 50
-            arch = 'x64'
+
+class DartLibInfo:
+    def __init__(
+        self,
+        version: str,
+        os_name: str,
+        arch: str,
+        has_compressed_ptrs: bool | None = None,
+        snapshot_hash: str | None = None,
+    ):
+        self.os_name = os_name
+        self.arch = arch
+        self.snapshot_hash = snapshot_hash
+        if has_compressed_ptrs is None:
+            # use same as flutter default configuration
+            # TODO: old Dart version has no pointer compression
+            self.has_compressed_ptrs = os_name != "ios"
         else:
-            assert False, "Unsupport architecture: " + elf.header.e_machine
+            self.has_compressed_ptrs = has_compressed_ptrs
+        
+        if os.path.exists(os.path.join(SCRIPT_DIR, "bin")):
+            file_name_version = []
+            suffixes = ["", "_no-analysis", "_ida-fcn", "_no-analysis_ida-fcn", "_no-compressed-ptrs", "_no-compressed-ptrs_no-analysis", "_no-compressed-ptrs_no-analysis_ida-fcn", "_no-compressed-ptrs_ida-fcn"]
+            for file in os.listdir(os.path.join(SCRIPT_DIR, "bin")):
+                for suffix in suffixes:
+                    if file.startswith("blutter_dartvm") and file.endswith(f"{os_name}_{arch}{suffix}"):
+                        file_name_version.append(file.split("_")[1].replace('dartvm', ''))
 
-        section = elf.get_section_by_name('.rodata')
-        data = section.data()
-        
-        sha_hashes = re.findall(b'\x00([a-f\\d]{40})(?=\x00)', data)
-        #print(sha_hashes)
-        # all possible engine ids
-        engine_ids = [ h.decode() for h in sha_hashes ]
-        assert len(engine_ids) == 2, f'found hashes {", ".join(engine_ids)}'
-        
-        # beta/dev version of flutter might not use stable dart version (we can get dart version from sdk with found engine_id)
-        # support only stable
-        epos = data.find(b' (stable) (')
-        if epos == -1:
-            dart_version = None
+            for key, versions in dart_versions.items():
+                if version in versions and any(v in versions for v in file_name_version):
+                    matched_version = next(v for v in file_name_version if v in versions)
+                    self.lib_name = f"dartvm{matched_version}_{os_name}_{arch}"
+                    self.version = matched_version
+                    return
+
+        self.version = version
+        self.lib_name = f"dartvm{version}_{os_name}_{arch}"
+
+
+def checkout_dart(info: DartLibInfo):
+    clonedir = os.path.join(SDK_DIR, f"v{info.version}")
+    version_file = os.path.join(clonedir, "runtime", "vm", "version.cc")
+
+    # Clean up if an incomplete checkout exists
+    if os.path.isdir(clonedir) and not os.path.isfile(version_file):
+        logging.warning(f"Cleaning up broken Dart checkout: {clonedir}")
+        remove_directory(clonedir)
+
+    if not os.path.exists(clonedir):
+        logging.info(f"Cloning Dart SDK {info.version} into {clonedir}")
+        try:
+            subprocess.run([
+                GIT_CMD, "-c", "advice.detachedHead=false", "clone",
+                "-b", info.version, "--depth", "1", "--filter=blob:none",
+                "--sparse", "--progress", DART_GIT_URL, clonedir
+            ], check=True)
+
+            subprocess.run([
+                GIT_CMD, "sparse-checkout", "set",
+                "runtime", "tools", "third_party/double-conversion"
+            ], cwd=clonedir, check=True)
+
+            logging.info("Sparse checkout done.")
+
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Git clone/setup failed: {e}")
+            raise RuntimeError("Dart SDK checkout failed.") from e
+
+    return clonedir
+
+
+    # clone Dart source code
+    if not os.path.exists(clonedir):
+        # minimum clone repository at the target branch
+        subprocess.run(
+            [
+                GIT_CMD,
+                "-c",
+                "advice.detachedHead=false",
+                "clone",
+                "-b",
+                info.version,
+                "--depth",
+                "1",
+                "--filter=blob:none",
+                "--sparse",
+                "--progress",
+                DART_GIT_URL,
+                clonedir,
+            ],
+            check=True,
+        )
+        # checkout only needed sources (runtime and tools)
+        # since Dart 3.3 "third_party/double-conversion" is moved to outside of "runtime" directory
+        subprocess.run(
+            [
+                GIT_CMD,
+                "sparse-checkout",
+                "set",
+                "runtime",
+                "tools",
+                "third_party/double-conversion",
+            ],
+            cwd=clonedir,
+            check=True,
+        )
+        # delete some unnecessary files
+        with os.scandir(clonedir) as it:
+            for entry in it:
+                if entry.is_file():
+                    os.remove(entry.path)
+                elif entry.is_dir() and entry.name == ".git":
+                    # should ".git" directory be removed?
+                    pass
+
+        if info.snapshot_hash is None:
+            # if running with Python 3.12, tools/utils.py should be patched to replace imp module with importlib
+            # due to its remotion as stated in: https://docs.python.org/3.12/whatsnew/3.12.html#imp
+            if sys.version_info[:2] >= (3, 12):
+                utils_path = os.path.join(clonedir, "tools/utils.py")
+                if os.path.exists(utils_path):
+                    with open(utils_path, "r+") as f:
+                        content = f.read()
+                        # the python 3.12 warnings are fixed in https://github.com/dart-lang/sdk/commit/a100968232c7492ab0de26897ff019e5784d4d38
+                        if r"match_against('^MAJOR (\d+)$', content)" in content:
+                            # old Dart version
+                            # replace invalid escape sequences strings with raw strings to avoid SyntaxWarning
+                            # in future Python versions this warning will raise an error instead of warning
+                            # as stated in: https://docs.python.org/3/whatsnew/3.12.html#other-language-changes
+                            content = (
+                                content.replace(" ' awk ", " r' awk ")
+                                .replace("match_against('", "match_against(r'")
+                                .replace("re.search('", "re.search(r'")
+                            )
+                            if "import imp\n" in content:
+                                content = content.replace(
+                                    "import imp\n", imp_replace_snippet
+                                ).replace("imp.load_source", "load_source")
+                            f.seek(0)
+                            f.truncate()
+                            f.write(content)
+            # make version
+            subprocess.run(
+                [
+                    sys.executable,
+                    "tools/make_version.py",
+                    "--output",
+                    "runtime/vm/version.cc",
+                    "--input",
+                    "runtime/vm/version_in.cc",
+                ],
+                cwd=clonedir,
+                check=True,
+            )
         else:
-            pos = data.rfind(b'\x00', 0, epos) + 1
-            dart_version = data[pos:epos].decode()
-        
-    return engine_ids, dart_version, arch, 'android'
+            subprocess.run(
+                [sys.executable, MAKE_VERSION_FILE, clonedir, info.snapshot_hash],
+                check=True,
+            )
 
-def get_dart_sdk_url_size(engine_ids):
-    #url = f'https://storage.googleapis.com/dart-archive/channels/stable/release/3.0.3/sdk/dartsdk-windows-x64-release.zip'
-    for engine_id in engine_ids:
-        url = f'https://storage.googleapis.com/flutter_infra_release/flutter/{engine_id}/dart-sdk-windows-x64.zip'
-        resp = requests.head(url)
-        if resp.status_code == 200:
-           sdk_size = int(resp.headers['Content-Length'])
-           return engine_id, url, sdk_size
-    
-    return None, None, None
+    return clonedir
 
-def get_dart_commit(url):
-    # in downloaded zip
-    # * dart-sdk/revision - the dart commit id of https://github.com/dart-lang/sdk/
-    # * dart-sdk/version  - the dart version
-    # revision and version zip file records should be in first 4096 bytes
-    # using stream in case a server does not support range
-    commit_id = None
-    dart_version = None
-    fp = None
-    with requests.get(url, headers={"Range": "bytes=0-4096"}, stream=True) as r:
-        if r.status_code // 10 == 20:
-            x = next(r.iter_content(chunk_size=4096))
-            fp = io.BytesIO(x)
-    
-    if fp is not None:
-        while fp.tell() < 4096-30 and (commit_id is None or dart_version is None):
-            #sig, ver, flags, compression, filetime, filedate, crc, compressSize, uncompressSize, filenameLen, extraLen = unpack(fp, '<IHHHHHIIIHH')
-            _, _, _, compMethod, _, _, _, compressSize, _, filenameLen, extraLen = unpack('<IHHHHHIIIHH', fp.read(30))
-            filename = fp.read(filenameLen)
-            #print(filename)
-            if extraLen > 0:
-                fp.seek(extraLen, io.SEEK_CUR)
-            data = fp.read(compressSize)
-            
-            # expect compression method to be zipfile.ZIP_DEFLATED
-            assert compMethod == zipfile.ZIP_DEFLATED, 'Unexpected compression method'
-            if filename == b'dart-sdk/revision':
-                commit_id = zlib.decompress(data, wbits=-zlib.MAX_WBITS).decode().strip()
-            elif filename == b'dart-sdk/version':
-                dart_version = zlib.decompress(data, wbits=-zlib.MAX_WBITS).decode().strip()
-    
-    # TODO: if no revision and version in first 4096 bytes, get the file location from the first zip dir entries at the end of file (less than 256KB)
-    return commit_id, dart_version
 
-def extract_dart_info(libapp_file: str, libflutter_file: str):
-    snapshot_hash, flags = extract_snapshot_hash_flags(libapp_file)
-    #print('snapshot hash', snapshot_hash)
-    #print(flags)
+def get_dartlib_name(ver: str, arch: str, os_name: str):
+    return f"dartvm{ver}_{os_name}_{arch}"
 
-    engine_ids, dart_version, arch, os_name = extract_libflutter_info(libflutter_file)
-    # print('possible engine ids', engine_ids)
-    # print('dart version', dart_version)
 
-    if dart_version is None:
-        engine_id, sdk_url, sdk_size = get_dart_sdk_url_size(engine_ids)
-        # print(engine_id)
-        # print(sdk_url)
-        # print(sdk_size)
+def cmake_dart(info: DartLibInfo, target_dir: str):
+    # On windows, need developer command prompt for x64 (can check with "cl" command)
+    # create dartsdk/vx.y.z/CMakefile.list
+    with open(CMAKE_TEMPLATE_FILE, "r") as f:
+        code = f.read()
+    with open(os.path.join(target_dir, "CMakeLists.txt"), "w") as f:
+        f.write(code.replace("VERSION_PLACE_HOLDER", info.version))
 
-        commit_id, dart_version = get_dart_commit(sdk_url)
-        # print(commit_id)
-        # print(dart_version)
-        #assert dart_version == dart_version_sdk
-    
-    # TODO: os (android or ios) and architecture (arm64 or x64)
-    return dart_version, snapshot_hash, flags, arch, os_name
+    # create dartsdk/vx.y.z/Config.cmake.in
+    with open(os.path.join(target_dir, "Config.cmake.in"), "w") as f:
+        f.write("@PACKAGE_INIT@\n\n")
+        f.write('include ( "${CMAKE_CURRENT_LIST_DIR}/dartvmTarget.cmake" )\n\n')
+
+    # generate source list
+    subprocess.run([sys.executable, CREATE_SRCLIST_FILE, target_dir], check=True)
+    # cmake -GNinja -Bout3.0.3 -DCMAKE_BUILD_TYPE=Release
+    #   add -DTARGET_ARCH=x64 for analyzing x64 libapp.so
+    #   add -DTARGET_OS=ios for analyzing ios App
+    # Note: pointer compression feature is set from Flutter and no one change it when building app.
+    #       so only one build of Dart runtime is enough
+    builddir = os.path.join(BUILD_DIR, info.lib_name)
+    subprocess.run(
+        [
+            CMAKE_CMD,
+            "-GNinja",
+            "-B",
+            builddir,
+            f"-DTARGET_OS={info.os_name}",
+            f"-DTARGET_ARCH={info.arch}",
+            f"-DCOMPRESSED_PTRS={1 if info.has_compressed_ptrs else 0}",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "--log-level=NOTICE",
+        ],
+        cwd=target_dir,
+        check=True,
+    )
+
+    # build and install dart vm library to packages directory
+    subprocess.run([NINJA_CMD], cwd=builddir, check=True)
+    subprocess.run([CMAKE_CMD, "--install", "."], cwd=builddir, check=True)
+
+
+def fetch_and_build(info: DartLibInfo):
+    outdir = checkout_dart(info)
+    cmake_dart(info, outdir)
 
 
 if __name__ == "__main__":
-    libdir = sys.argv[1]
-    libapp_file = os.path.join(libdir, 'libapp.so')
-    libflutter_file = os.path.join(libdir, 'libflutter.so')
-
-    print(extract_dart_info(libapp_file, libflutter_file))
+    ver = sys.argv[1]
+    os_name = "android" if len(sys.argv) < 3 else sys.argv[2]
+    arch = "arm64" if len(sys.argv) < 4 else sys.argv[3]
+    snapshot_hash = None if len(sys.argv) < 5 else sys.argv[4]
+    info = DartLibInfo(ver, os_name, arch, snapshot_hash=snapshot_hash)
+    fetch_and_build(info)

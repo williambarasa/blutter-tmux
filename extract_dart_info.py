@@ -5,6 +5,8 @@ import subprocess
 import sys
 import logging
 import subprocess
+import re 
+import requests 
 
 # assume git and cmake (64 bits) command is in PATH
 GIT_CMD = "git"

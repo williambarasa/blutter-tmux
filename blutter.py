@@ -7,6 +7,8 @@ import shutil
 import subprocess
 import sys
 import zipfile
+import tempfile
+
 
 from dartvm_fetch_build import DartLibInfo
 
